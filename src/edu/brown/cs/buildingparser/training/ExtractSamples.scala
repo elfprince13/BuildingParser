@@ -6,7 +6,7 @@ import org.apache.commons.io.FilenameUtils
 import java.io.File
 import scala.util.Sorting
 import org.opencv.highgui.Highgui
-import edu.brown.cs.buildingparser.ui.Util
+import edu.brown.cs.buildingparser.Util
 import org.opencv.core.Mat
 import org.opencv.core.Core
 import org.opencv.core.CvType
@@ -16,6 +16,7 @@ import scala.collection.JavaConverters._
 import org.opencv.core.Rect
 import org.opencv.core.Range
 import scala.util.Random
+import edu.brown.cs.buildingparser.Util
 
 class ExtractSamples(imgDir:String, labelDir:String, destDir:String, antiDestDir:String, exts:Set[String], 
 		bounds:List[Size], srcLabelMap:Map[String,(Scalar,Boolean)], dstLabelMap:Map[(Scalar,Boolean),String]) {
@@ -54,9 +55,6 @@ class ExtractSamples(imgDir:String, labelDir:String, destDir:String, antiDestDir
 		}
 	}
 
-	def filterContentsByExts(handle:File):Set[File] = {
-			(Set[File]() ++ handle.listFiles).filter(img => exts.exists( ext => img.getName.endsWith(ext) ) )
-	}
 
 	def stripExts(handle:File):File = {
 			new File(FilenameUtils.getBaseName(handle.getName))
@@ -64,8 +62,8 @@ class ExtractSamples(imgDir:String, labelDir:String, destDir:String, antiDestDir
 
 	val imgDirHandle = new File(imgDir)
 	val labelDirHandle = new File(labelDir)
-	val srcImgs:Set[File] = filterContentsByExts(imgDirHandle)
-	val labelImgs:Set[File] = filterContentsByExts(labelDirHandle)
+	val srcImgs:Set[File] = Util.filterContentsByExts(imgDirHandle,exts)
+	val labelImgs:Set[File] = Util.filterContentsByExts(labelDirHandle,exts)
 
 	// Assumption: There is only one file with the same basename per directory
 	// Also this makes a lot of garbage, but it should only run a few times
@@ -176,4 +174,44 @@ class ExtractSamples(imgDir:String, labelDir:String, destDir:String, antiDestDir
 }
 
 class ExtractorException(msg:String) extends Exception(msg);
+
+object SamplerMain {
+	val dimBuckets = List(16, 32, 48, 64, 96, 128)
+		
+	val boundBuckets = (for( i <- dimBuckets; j <- dimBuckets) yield Pair(i,j)) map {
+		case (i, j) => new Size(i, j)
+	}
+	
+	var isMain = true
+	
+	def main(args:Array[String]):Unit = {
+		if(isMain){
+			System.loadLibrary(Core.NATIVE_LIBRARY_NAME)
+		}
+		
+		val parisSampler = new ExtractSamples(
+				"/Users/thomas/Documents/Brown/CS2951B-DataDrivenVisionandGraphics/cvpr2010/images",
+				"/Users/thomas/Documents/Brown/CS2951B-DataDrivenVisionandGraphics/ground_truth_2011.zip Folder",
+				"object-classes", "anti-object-classes", Set[String](".png",".jpg",".jpeg"),
+				boundBuckets, Map[String,(Scalar,Boolean)]("window" -> (new Scalar(0,0,255),true),
+			 	"balcony" -> (new Scalar(255,0,128),true),
+			 	"door" -> (new Scalar(0,128,255),true)), Map[(Scalar,Boolean),String]((new Scalar(0,0,255),true) -> "window",
+			 	(new Scalar(255,0,128),true) -> "balcony",
+			 	(new Scalar(0,128,255),true) -> "door")
+		)
+
+		val grazSampler = new ExtractSamples(
+				"/Users/thomas/Documents/Brown/CS2951B-DataDrivenVisionandGraphics/graz50_facade_dataset.zip Folder/graz50_facade_dataset/images",
+				"/Users/thomas/Documents/Brown/CS2951B-DataDrivenVisionandGraphics/graz50_facade_dataset.zip Folder/graz50_facade_dataset/labels_full",
+				"object-classes", "anti-object-classes", Set[String](".png",".jpg",".jpeg"),
+				boundBuckets, Map[String,(Scalar,Boolean)]("window" -> (new Scalar(0,0,255),true),
+			 	"balcony" -> (new Scalar(255,0,128),true),
+			 	"door" -> (new Scalar(0,128,255),true)
+				), Map[(Scalar,Boolean),String]((new Scalar(0,0,255),true) -> "window",
+			 	(new Scalar(255,0,128),true) -> "balcony",
+			 	(new Scalar(0,128,255),true) -> "door")
+		
+		)
+	}
+}
 

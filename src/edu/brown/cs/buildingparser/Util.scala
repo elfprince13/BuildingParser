@@ -1,4 +1,4 @@
-package edu.brown.cs.buildingparser.ui
+package edu.brown.cs.buildingparser
 
 import org.opencv.core.Core
 import org.opencv.core.Mat
@@ -16,9 +16,17 @@ import org.opencv.core.Size
 import org.opencv.core.Point
 import org.opencv.core.CvType
 import org.opencv.core.Scalar
+import java.io.File
 
 
 object Util {
+	def filterContentsByExts(handle:File, exts:Set[String]):Set[File] = {
+			(Set[File]() ++ handle.listFiles).filter(img => exts.exists( ext => img.getName.endsWith(ext) ) )
+	}
+	
+	def filterContentsByIsDir(handle:File, wantDirs:Boolean):Set[File] = {
+		(Set[File]() ++ handle.listFiles).filter(handle => handle.isDirectory == wantDirs )
+	}
 	
 	def svmFeatureFromHog(hog:HOGDescriptor, maxHog:HOGDescriptor, hogF:Mat):Mat = {
 		val dim = (maxHog.getDescriptorSize() + 2).asInstanceOf[Int]
