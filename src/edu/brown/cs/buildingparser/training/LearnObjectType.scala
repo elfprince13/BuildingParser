@@ -8,6 +8,8 @@ import org.opencv.core.Mat
 import org.opencv.core.CvType
 import org.opencv.highgui.Highgui
 import org.opencv.core.MatOfFloat
+import scala.actors.Actor
+import scala.actors.Channel
 
 class LearnObjectType(className:String, objDir:String, objAntiDir:String, counterClasses:List[String],
 		exts:Set[String], hogs:List[HOGDescriptor]) {
@@ -41,13 +43,16 @@ class LearnObjectType(className:String, objDir:String, objAntiDir:String, counte
 	
 	def initTrainingData():Unit = {
 		val posCount = posExamples.size
+		val negCount = negExamples.size
 		val maxHog = hogBuckets(biggestBucket)
 		val rowWidth = (2 + maxHog.getDescriptorSize).asInstanceOf[Int]
 		trainData = Mat.zeros(totalExamples, rowWidth, CvType.CV_32F)
 		responses = Mat.zeros(totalExamples, 1 , CvType.CV_32F)
 		Mat.ones(posCount, 1, CvType.CV_32F).copyTo(responses.submat(0, posCount, 0, 1))
-		Console.println("Estimate trainData is " + ((trainData.size.area * 4) / (1024 * 1024)).intValue + "MB")
-		Console.print("Copying posExamples...\t")
+		Mat.ones(negCount, 1, CvType.CV_32F).mul(Mat.ones(negCount, 1, CvType.CV_32F), -1).copyTo(responses.submat(posCount, totalExamples, 0, 1))
+		
+		Console.println("Estimate trainData for " + className + " is " + ((trainData.size.area * 4) / (1024 * 1024)).intValue + "MB")
+		Console.println("Copying posExamples for " + className + " ...\t")
 		posExamples.seq.zipWithIndex.foreach{
 			case(posExample, row) =>
 				val exMat = Highgui.imread(posExample, Highgui.CV_LOAD_IMAGE_GRAYSCALE)
@@ -56,8 +61,7 @@ class LearnObjectType(className:String, objDir:String, objAntiDir:String, counte
 				hog.compute(exMat,exHogF)
 				Util.svmFeatureFromHog(hog, maxHog, exHogF).copyTo(trainData.submat(row, row + 1, 0, rowWidth))
 		}
-		Console.println("done!")
-		Console.print("Copying negExamples...\t")
+		Console.println("Copying negExamples for " + className + " ...\t")
 		negExamples.seq.zipWithIndex.foreach{
 			case(negExample, row) =>
 				val exMat = Highgui.imread(negExample, Highgui.CV_LOAD_IMAGE_GRAYSCALE)
@@ -66,8 +70,6 @@ class LearnObjectType(className:String, objDir:String, objAntiDir:String, counte
 				hog.compute(exMat,exHogF)
 				Util.svmFeatureFromHog(hog, maxHog, exHogF).copyTo(trainData.submat(posCount + row, posCount + row + 1, 0, rowWidth))
 		}
-		Console.println("done!")
-		
 	}
 	
 	def clearExamplesLists():Unit = {
@@ -76,6 +78,7 @@ class LearnObjectType(className:String, objDir:String, objAntiDir:String, counte
 	}
 	
 	def doTrain():Unit = {
+		Console.println("Beginning training of " + className)
 		mySVM.train(trainData, responses)
 	}
 	
@@ -86,40 +89,39 @@ class LearnObjectType(className:String, objDir:String, objAntiDir:String, counte
 }
 
 object LearnerFactory {
+	class Learner(className:String, counterClasses:List[String], usedHogs:List[HOGDescriptor]) extends Actor {
+		def act():Unit = {
+			val learner = new LearnObjectType(className, "object-classes", "anti-object-classes", counterClasses, Set[String](".png",".jpg",".jpeg"), usedHogs)
+			learner.initExamplesLists
+			learner.initTrainingData
+			learner.clearExamplesLists // Save some memory
+			learner.initSVM
+			learner.doTrain
+			learner.saveResults("trained-svms", prefix = ("" + System.currentTimeMillis))
+			Console.println(className + "-learner complete")
+			exit
+		}
+	}
+	
 	def learnDoors(usedHogs:List[HOGDescriptor]) = {
-		val doorLearner = new LearnObjectType("door","object-classes","anti-object-classes",
-				List("window","balcony"),Set[String](".png",".jpg",".jpeg"), usedHogs)
-		doorLearner.initExamplesLists
-		doorLearner.initTrainingData
-		doorLearner.clearExamplesLists // Save some memory
-		doorLearner.initSVM
-		doorLearner.doTrain
-		doorLearner.saveResults("trained-svms", prefix = ("" + System.currentTimeMillis))
+		val doorLearner = new Learner("door", List("window","balcony"), usedHogs)
+		doorLearner.act
+		doorLearner
 	}
 	
 	def learnWindows(usedHogs:List[HOGDescriptor]) = {
-		val windowLearner = new LearnObjectType("window","object-classes","anti-object-classes",
-				List("door","balcony"),Set[String](".png",".jpg",".jpeg"), usedHogs)
-		windowLearner.initExamplesLists
-		windowLearner.initTrainingData
-		windowLearner.clearExamplesLists // Save some memory
-		windowLearner.initSVM
-		windowLearner.doTrain
-		windowLearner.saveResults("trained-svms", prefix = ("" + System.currentTimeMillis))
+		val windowLearner = new Learner("window",List("door","balcony"),usedHogs)
+		windowLearner.act
+		windowLearner
 	}
 	
 	def learnBalconies(usedHogs:List[HOGDescriptor]) = {
-		val balconyLearner = new LearnObjectType("balcony","object-classes","anti-object-classes",
-				List("door","window"),Set[String](".png",".jpg",".jpeg"), usedHogs)
-		balconyLearner.initExamplesLists
-		balconyLearner.initTrainingData
-		balconyLearner.clearExamplesLists // Save some memory
-		balconyLearner.initSVM
-		balconyLearner.doTrain
-		balconyLearner.saveResults("trained-svms", prefix = ("" + System.currentTimeMillis))
+		val balconyLearner = new Learner("balcony", List("door","window"), usedHogs)
+		balconyLearner.act
+		balconyLearner
 	}
 	
-	def learnAll(usedHogs:List[HOGDescriptor]) = {
+	def learnAll(usedHogs:List[HOGDescriptor]):Unit = {
 		learnDoors(usedHogs)
 		learnWindows(usedHogs)
 		learnBalconies(usedHogs)

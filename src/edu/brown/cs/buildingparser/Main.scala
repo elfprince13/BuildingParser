@@ -54,6 +54,6 @@ object Main {
 		sd.detect(testImg2)
 		*/
 		
-		
+		LearnerFactory.learnAll(usedHogs)
 	}
 }
