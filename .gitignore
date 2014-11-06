@@ -1,5 +1,6 @@
 object-classes/
 anti-object-classes/
+trained-svms/
 bin/
 .cache
-
+*.opencv_svm

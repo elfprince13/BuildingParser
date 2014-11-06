@@ -82,5 +82,46 @@ class LearnObjectType(className:String, objDir:String, objAntiDir:String, counte
 	def saveResults(savedir:String, prefix:String = "", suffix:String = "" , ext:String = "opencv_svm"):Unit = {
 		mySVM.save(savedir +  File.separator + prefix + "_" + className + "_" + suffix + "." + ext)
 	}
+	
+}
 
+object LearnerFactory {
+	def learnDoors(usedHogs:List[HOGDescriptor]) = {
+		val doorLearner = new LearnObjectType("door","object-classes","anti-object-classes",
+				List("window","balcony"),Set[String](".png",".jpg",".jpeg"), usedHogs)
+		doorLearner.initExamplesLists
+		doorLearner.initTrainingData
+		doorLearner.clearExamplesLists // Save some memory
+		doorLearner.initSVM
+		doorLearner.doTrain
+		doorLearner.saveResults("trained-svms", prefix = ("" + System.currentTimeMillis))
+	}
+	
+	def learnWindows(usedHogs:List[HOGDescriptor]) = {
+		val windowLearner = new LearnObjectType("window","object-classes","anti-object-classes",
+				List("door","balcony"),Set[String](".png",".jpg",".jpeg"), usedHogs)
+		windowLearner.initExamplesLists
+		windowLearner.initTrainingData
+		windowLearner.clearExamplesLists // Save some memory
+		windowLearner.initSVM
+		windowLearner.doTrain
+		windowLearner.saveResults("trained-svms", prefix = ("" + System.currentTimeMillis))
+	}
+	
+	def learnBalconies(usedHogs:List[HOGDescriptor]) = {
+		val balconyLearner = new LearnObjectType("balcony","object-classes","anti-object-classes",
+				List("door","window"),Set[String](".png",".jpg",".jpeg"), usedHogs)
+		balconyLearner.initExamplesLists
+		balconyLearner.initTrainingData
+		balconyLearner.clearExamplesLists // Save some memory
+		balconyLearner.initSVM
+		balconyLearner.doTrain
+		balconyLearner.saveResults("trained-svms", prefix = ("" + System.currentTimeMillis))
+	}
+	
+	def learnAll(usedHogs:List[HOGDescriptor]) = {
+		learnDoors(usedHogs)
+		learnWindows(usedHogs)
+		learnBalconies(usedHogs)
+	}
 }

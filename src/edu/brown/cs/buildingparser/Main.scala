@@ -11,6 +11,8 @@ import org.opencv.core.Scalar
 import org.opencv.core.Size
 import edu.brown.cs.buildingparser.training.SamplerMain
 import edu.brown.cs.buildingparser.training.LearnObjectType
+import edu.brown.cs.buildingparser.detection.SVMDetector
+import edu.brown.cs.buildingparser.training.LearnerFactory
 
 object Main {
 	def main(args:Array[String]):Unit = {
@@ -38,15 +40,19 @@ object Main {
 		//Util.svmFeatureFromHog(hog, maxHog, hogF)
 		
 		//Util.makeImageFrame(Util.matToImage(Util.makeBoundaryMirrored(image, 128)))
-		
-		val doorLearner = new LearnObjectType("door","object-classes","anti-object-classes",
+					
+		/*
+		val lot = new LearnObjectType("door","object-classes","anti-object-classes",
 				List("window","balcony"),Set[String](".png",".jpg",".jpeg"), usedHogs)
-		doorLearner.initExamplesLists
-		doorLearner.initTrainingData
-		doorLearner.clearExamplesLists // Save some memory
-		doorLearner.initSVM
-		doorLearner.doTrain
-		doorLearner.saveResults("trained-svms", prefix = ("" + System.currentTimeMillis))
+		lot.initExamplesLists
+		val testImg = Highgui.imread(lot.posExamples(0), Highgui.CV_LOAD_IMAGE_GRAYSCALE)
+		Console.println("Testing: " + testImg.size)
+		val sd = new SVMDetector("trained-svms/1415252858024_door_.opencv_svm",usedHogs)
+		sd.detect(testImg)
+		val testImg2 = Highgui.imread(lot.negExamples(lot.negExamples.size - 35), Highgui.CV_LOAD_IMAGE_GRAYSCALE)
+		Console.println("Testing: " + testImg2.size)
+		sd.detect(testImg2)
+		*/
 		
 		
 	}
