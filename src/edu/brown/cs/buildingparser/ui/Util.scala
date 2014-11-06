@@ -20,6 +20,26 @@ import org.opencv.core.Scalar
 
 object Util {
 	
+	def svmFeatureFromHog(hog:HOGDescriptor, maxHog:HOGDescriptor, hogF:Mat):Mat = {
+		val dim = (maxHog.getDescriptorSize() + 2).asInstanceOf[Int]
+		val outMat = Mat.zeros(1, dim, CvType.CV_32F)
+		val sizeBuf = new Array[Float](1)
+		sizeBuf(0) = hog.get_winSize().width.asInstanceOf[Float]
+		outMat.put(0,0,sizeBuf)
+		sizeBuf(0) = hog.get_winSize().height.asInstanceOf[Float]
+		outMat.put(0,1,sizeBuf)
+		hogF.t().copyTo(outMat.submat(0,1,2,2+hogF.rows))
+		
+		/*
+		Console.println("svm from hog")
+		Console.println(outMat.get(0,0)(0) + " x " + outMat.get(0,1)(0))
+		Console.println(hog.get_winSize())
+		Console.println(outMat.dump())
+		Console.println(hogF.t().dump())
+		*/
+		outMat
+	}
+	
 	def makeBoundaryFilled(inMat:Mat, border:Int):Mat = {
 		val outMat = Mat.zeros(inMat.rows + 2 * border, inMat.cols + 2 * border, inMat.`type`)
 		// Copy primary region
