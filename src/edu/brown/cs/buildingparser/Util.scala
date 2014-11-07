@@ -17,9 +17,35 @@ import org.opencv.core.Point
 import org.opencv.core.CvType
 import org.opencv.core.Scalar
 import java.io.File
-
+import org.opencv.core.Rect
+import jsat.clustering.MeanShift
+import jsat.SimpleDataSet
+import jsat.classifiers.DataPoint
+import collection.JavaConverters._
+import jsat.linear.Vec
+import jsat.linear.DenseVector
+import jsat.classifiers.CategoricalData
+import org.opencv.core.MatOfPoint
 
 object Util {
+	
+	def clusterRects(bbs:List[Rect]):Array[Int] = {
+		Console.println("Clustering rects")
+		val clusterer = new MeanShift
+		val data = new SimpleDataSet(bbs.map{rect => 
+			val tl = rect.tl
+			val br = rect.br
+			val rectV = new DenseVector(List(tl.x, tl.y, br.x, br.y).map(_.asInstanceOf[java.lang.Double]).asJava)
+			val dp = new DataPoint(rectV, new Array[Int](0), new Array[CategoricalData](0))
+			dp}.asJava)
+		val clusterAssignments = clusterer.cluster(data, null)
+		clusterAssignments.foreach{
+			i => Console.print(i + " ")
+		}
+		Console.println("")
+		clusterAssignments
+	}
+	
 	def filterContentsByExts(handle:File, exts:Set[String]):Set[File] = {
 			(Set[File]() ++ handle.listFiles).filter(img => exts.exists( ext => img.getName.endsWith(ext) ) )
 	}

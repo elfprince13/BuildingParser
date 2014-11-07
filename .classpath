@@ -6,5 +6,6 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/BURLAP"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/OpenCV"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Apache Commons IO"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JSAT"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
