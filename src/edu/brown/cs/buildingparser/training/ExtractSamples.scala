@@ -25,18 +25,8 @@ class ExtractSamples(imgDir:String, labelDir:String, destDir:String, antiDestDir
 	val INV_OVERLAP_THRESHOLD = 3
 	val COUNTER_EXAMPLES_PER_BINSIZE = 4
 	val MAX_RANDOM_DEPTH = 20
-
-	def bestBoundsBucket(box:Rect):Size = {
-			bounds.filter(bound => 
-			bound.width >= box.width && 
-			bound.height >= box.height).foldLeft(null.asInstanceOf[Size])(
-					(best, proposed) => 
-					if(best == null || Math.max(best.width - box.width, best.height - box.height) > Math.max(proposed.width - box.width, proposed.height - box.height)){
-						proposed	
-					} else {
-						best
-					})
-	}
+	
+	def bestBoundsBucket(box:Rect):Size = Util.bestBoundsBucket(box,bounds)
 	
 	def findCounterExample(srcImg: Mat, exclBoxes: Traversable[Rect], bound: Size, depth:Int = 0):Rect = {
 		val x = coordGen.nextInt(srcImg.width - 2 * BOUNDARY_WIDTH - bound.width.intValue) + BOUNDARY_WIDTH
@@ -77,13 +67,7 @@ class ExtractSamples(imgDir:String, labelDir:String, destDir:String, antiDestDir
 				if(bestBounds == null){
 					null
 				} else {
-					val grabW = bestBounds.width.toInt
-					val grabH = bestBounds.height.toInt
-					val xdiff = grabW - box.width
-					val ydiff = grabH - box.height
-					val x = box.x - xdiff / 2
-					val y = box.y - ydiff / 2
-					val grabBox = new Rect(x,y,grabW,grabH)
+					val grabBox = Util.calcGrabBox(box, bestBounds)
 					val grabMat = srcImg.submat(grabBox)
 					(box,i,grabMat)
 				}				
@@ -185,8 +169,13 @@ class ExtractSamples(imgDir:String, labelDir:String, destDir:String, antiDestDir
 class ExtractorException(msg:String) extends Exception(msg);
 
 object SamplerMain {
-	val dimBuckets = List(16, 32, 48, 64, 96, 128)
-		
+	
+	val stdLabelProps = Map[String,(Scalar,Boolean)](
+						"window" -> (new Scalar(0,0,255),true),
+						"balcony" -> (new Scalar(255,0,128),true),
+						"door" -> (new Scalar(0,128,255),true))
+	
+	val dimBuckets = List(16, 32, 48, 64, 96, 128)	
 	val boundBuckets = (for( i <- dimBuckets; j <- dimBuckets) yield Pair(i,j)) map {
 		case (i, j) => new Size(i, j)
 	}
@@ -197,15 +186,8 @@ object SamplerMain {
 		new ExtractSamples(imgDir, labelDir,
 				"object-classes", "anti-object-classes", Set[String](".png",".jpg",".jpeg"),
 				boundBuckets, 
-				Map[String,(Scalar,Boolean)](
-						"window" -> (new Scalar(0,0,255),true),
-						"balcony" -> (new Scalar(255,0,128),true),
-						"door" -> (new Scalar(0,128,255),true)), 
-			 	Map[(Scalar,Boolean),String](
-			 			(new Scalar(0,0,255),true) -> "window",
-			 			(new Scalar(255,0,128),true) -> "balcony",
-			 			(new Scalar(0,128,255),true) -> "door")
-			 			)
+				stdLabelProps, 
+				stdLabelProps.map(kvp => (kvp._2, kvp._1)))
 	}
 	
 	def parisSampler() = {

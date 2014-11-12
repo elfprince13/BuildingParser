@@ -14,13 +14,66 @@ import edu.brown.cs.buildingparser.training.LearnObjectType
 import edu.brown.cs.buildingparser.detection.SVMDetector
 import edu.brown.cs.buildingparser.training.LearnerFactory
 import edu.brown.cs.buildingparser.detection.FindObjectKinds
+import jsat.linear.DenseVector
+import collection.JavaConverters._
+import scala.util.Random
+import jsat.SimpleDataSet
+import jsat.classifiers.DataPoint
+import jsat.classifiers.CategoricalData
+import jsat.clustering.MeanShift
+import org.opencv.imgproc.Imgproc
+import org.opencv.core.Rect
+import org.opencv.core.Point
 
 object Main {
+	def jDL(l:List[Double]):java.util.List[java.lang.Double] = {
+		l.map(_.asInstanceOf[java.lang.Double]).asJava
+	}
+	
+	def showObjectBorders(image:Mat, contents:Map[String, List[(Rect,Mat)]]):Unit = {
+		contents.foreach{
+			case(labelName, objs) => objs.foreach{
+					case(box, subImg) => 
+						Core.rectangle(image, box.tl, box.br, SamplerMain.stdLabelProps(labelName)._1)
+				}
+		}
+	}
+	
+	def showAvgObjects(image:Mat, clusteredContents:Map[String, Map[Int,(Mat,List[Rect])]], ofs:Point, boundBuckets:List[Size]) = {
+		clusteredContents.foreach{
+			case(labelName, clusters) =>
+				clusters.foreach{
+					case(clusterNum, cluster) => 
+						val repM = cluster._1
+						cluster._2.foreach{
+							rect => 
+								val grabBox = Util.calcGrabBox(rect, Util.bestBoundsBucket(rect, boundBuckets))
+								val ofsBox = new Rect(new Point(grabBox.x + ofs.x, grabBox.y + ofs.y), grabBox.size)
+								repM.copyTo(image.submat(ofsBox))
+						}
+				}		
+		}
+
+	}
+	
 	def main(args:Array[String]):Unit = {
 		System.loadLibrary(Core.NATIVE_LIBRARY_NAME)
 		SamplerMain.isMain = false
 		val dimBuckets = SamplerMain.dimBuckets
 		val boundBuckets = SamplerMain.boundBuckets
+		
+		val clusterCenters = List(
+				new DenseVector(jDL(List(1,0,0))), new DenseVector(jDL(List(0,0,0))), 
+				new DenseVector(jDL(List(1,0,1))), new DenseVector(jDL(List(0,0,1))), 
+				new DenseVector(jDL(List(1,1,0))), new DenseVector(jDL(List(0,1,0))), 
+				new DenseVector(jDL(List(1,1,1))), new DenseVector(jDL(List(0,1,1))))
+				
+		val rg = new Random
+		val dvs = clusterCenters.view.map(dv => Seq.fill(5)(dv.add(new DenseVector(jDL(Seq.fill(3)(rg.nextDouble / 20).toList))))).flatten.toList
+		val data = new SimpleDataSet(dvs.map(dv => new DataPoint(dv, new Array[Int](0), new Array[CategoricalData](0))).asJava)
+		val clusterer = new MeanShift
+		//Util.dumpClusters(clusterer.cluster(data).asScala.map(_.asScala.toList).toList)
+		
 		
 		
 		val defaultHog = new HOGDescriptor
@@ -29,21 +82,30 @@ object Main {
 					defaultHog.get_cellSize, defaultHog.get_nbins))
 		
 		val grazSampler = SamplerMain.grazSampler
-		val srcHandle = grazSampler.imgHandleFromName("facade_1_0056092_0056345.png")
+		val srcHandle = grazSampler.imgHandleFromName("facade_0_0099003_0099285.png")
 		val labelHandle = grazSampler.pairedImgs(srcHandle)
 		val (srcBase, examples) = grazSampler.extractOneExampleSet(srcHandle, labelHandle)
-		val image = Util.makeBoundaryMirrored(Highgui.imread(srcHandle.getAbsolutePath), 128)
+		val srcImg = Highgui.imread(srcHandle.getAbsolutePath, Highgui.CV_LOAD_IMAGE_COLOR)
+		val image = Util.makeBoundaryMirrored(srcImg, 128)
 		val cr = new FindObjectKinds(image)
-		examples.filter(_._1 == "window").toList(0) match {
-			case(_, labelColor:Scalar, posStream, _) =>
-				val windows = posStream.map(found => (found._1,found._3)).toList
-				Console.println("Have " + windows.length + " windows")
-				cr.makeClustersOf(windows, usedHogs)
-				windows.foreach{
-					case(box, subImg) => 
-						Core.rectangle(image, box.tl, box.br, new Scalar(1.0))
-				}
-		}
+		val imgContents = examples.view.filter(_._1 == "window").map{
+			case(labelName, labelColor:Scalar, posStream, _) =>
+				val objs = posStream.map(found => (found._1,found._3)).toList
+				Console.println("Have " + objs.length + " " + labelName + "s")
+				(labelName -> objs)
+		}.toMap
+		val clusteredContents = cr.clusterAllObjects(imgContents, usedHogs)
+		
+		showAvgObjects(image, clusteredContents, new Point(0, 0), boundBuckets)
+		showObjectBorders(image, imgContents)
+		
+		
+		val imgClip = image.submat(128, image.rows - 128, 128, image.cols - 128) 
+		Util.makeImageFrame(Util.matToImage(imgClip))
+		Util.makeImageFrame(Util.matToImage(srcImg))
+		val imgDiff = new Mat
+		Core.absdiff(srcImg, imgClip, imgDiff)
+		Util.makeImageFrame(Util.matToImage(imgDiff))
 		
 		
 		/*
@@ -61,7 +123,7 @@ object Main {
 		}
 		
 		*/
-		Util.makeImageFrame(Util.matToImage(image))
+		
 		
 
 		//LearnerFactory.learnAll(usedHogs)

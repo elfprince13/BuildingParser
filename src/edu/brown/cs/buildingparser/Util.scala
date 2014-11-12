@@ -26,8 +26,42 @@ import jsat.linear.Vec
 import jsat.linear.DenseVector
 import jsat.classifiers.CategoricalData
 import org.opencv.core.MatOfPoint
+import jsat.DataSet
 
 object Util {
+	
+	def calcGrabBox(box:Rect, bounds:Size):Rect = {
+		val grabW = bounds.width.toInt
+		val grabH = bounds.height.toInt
+		val xdiff = grabW - box.width
+		val ydiff = grabH - box.height
+		val x = box.x - xdiff / 2
+		val y = box.y - ydiff / 2
+		val grabBox = new Rect(x,y,grabW,grabH)
+		grabBox
+	}
+	
+	def bestBoundsBucket(box:Rect, bounds:List[Size]):Size = {
+			bounds.filter(bound => 
+			bound.width >= box.width && 
+			bound.height >= box.height).foldLeft(null.asInstanceOf[Size])(
+					(best, proposed) => 
+					if(best == null || Math.max(best.width - box.width, best.height - box.height) > Math.max(proposed.width - box.width, proposed.height - box.height)){
+						proposed	
+					} else {
+						best
+					})
+	}
+	
+	def dumpClusters(clusters:List[List[DataPoint]]) = {
+		clusters.foreach{ cluster =>
+			Console.println("Cluster:")
+			cluster.foreach{ dp =>
+				Console.println("\t" + dp.toString().substring(0,50) + ", ")
+			}
+			Console.println("")
+		}
+	}
 	
 	def clusterRects(bbs:List[Rect]):Array[Int] = {
 		Console.println("Clustering rects")
@@ -39,11 +73,25 @@ object Util {
 			val dp = new DataPoint(rectV, new Array[Int](0), new Array[CategoricalData](0))
 			dp}.asJava)
 		val clusterAssignments = clusterer.cluster(data, null)
+		/*
 		clusterAssignments.foreach{
 			i => Console.print(i + " ")
 		}
 		Console.println("")
+		*/
 		clusterAssignments
+	}
+	
+	def calcBandwidth(data:DataSet, scale:Double):Double = {
+		val vecs = data.getDataVectors().asScala
+		var distCounter = 0.
+		for(i <- 0 until vecs.size; j <- 0 until i){
+			val distUpd = vecs(i).subtract(vecs(j)).pNorm(2)
+			distCounter += distUpd
+			//Console.println(distUpd)
+		}
+		distCounter /= (vecs.length * (vecs.length - 1) / 2)
+		(distCounter * scale)
 	}
 	
 	def filterContentsByExts(handle:File, exts:Set[String]):Set[File] = {
