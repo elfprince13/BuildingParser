@@ -24,10 +24,15 @@ import jsat.clustering.MeanShift
 import org.opencv.imgproc.Imgproc
 import org.opencv.core.Rect
 import org.opencv.core.Point
+import edu.brown.cs.buildingparser.synth.LDrawGridify
 
 object Main {
 	def jDL(l:List[Double]):java.util.List[java.lang.Double] = {
 		l.map(_.asInstanceOf[java.lang.Double]).asJava
+	}
+	
+	def ofsPoint(pt:Point, ofs:Point):Point = {
+		new Point(pt.x + ofs.x, pt.y + ofs.y)
 	}
 	
 	def showObjectBorders(image:Mat, contents:Map[String, List[(Rect,Mat)]]):Unit = {
@@ -39,7 +44,7 @@ object Main {
 		}
 	}
 	
-	def showAvgObjects(image:Mat, clusteredContents:Map[String, Map[Int,(Mat,List[Rect])]], ofs:Point, boundBuckets:List[Size]) = {
+	def showAvgObjects(image:Mat, clusteredContents:Map[String, Map[Int,(Mat,List[Rect])]], ofs:Point) = {
 		clusteredContents.foreach{
 			case(labelName, clusters) =>
 				clusters.foreach{
@@ -47,8 +52,7 @@ object Main {
 						val repM = cluster._1
 						cluster._2.foreach{
 							rect => 
-								val grabBox = Util.calcGrabBox(rect, Util.bestBoundsBucket(rect, boundBuckets))
-								val ofsBox = new Rect(new Point(grabBox.x + ofs.x, grabBox.y + ofs.y), grabBox.size)
+								val ofsBox = new Rect(ofsPoint(rect.tl, ofs), rect.size)
 								repM.copyTo(image.submat(ofsBox))
 						}
 				}		
@@ -88,15 +92,23 @@ object Main {
 		val srcImg = Highgui.imread(srcHandle.getAbsolutePath, Highgui.CV_LOAD_IMAGE_COLOR)
 		val image = Util.makeBoundaryMirrored(srcImg, 128)
 		val cr = new FindObjectKinds(image)
-		val imgContents = examples.view.filter(_._1 == "window").map{
+		val imgContents = examples.view/*.filter(_._1 == "window")*/.map{
 			case(labelName, labelColor:Scalar, posStream, _) =>
 				val objs = posStream.map(found => (found._1,found._3)).toList
 				Console.println("Have " + objs.length + " " + labelName + "s")
 				(labelName -> objs)
 		}.toMap
-		val clusteredContents = cr.clusterAllObjects(imgContents, usedHogs)
+		val clusteredContents = cr.clusterAllObjects(imgContents, usedHogs).map{
+			case(labelName, clusters) =>
+				(labelName -> clusters.map{
+					case(clusterNum, cluster) => 
+						(clusterNum, (cluster._1, cluster._2.map(
+							rect => Util.calcGrabBox(rect, Util.bestBoundsBucket(rect, boundBuckets))
+						)))
+				})		
+		}
 		
-		showAvgObjects(image, clusteredContents, new Point(0, 0), boundBuckets)
+		showAvgObjects(image, clusteredContents, new Point(0, 0))
 		showObjectBorders(image, imgContents)
 		
 		
@@ -107,6 +119,48 @@ object Main {
 		Core.absdiff(srcImg, imgClip, imgDiff)
 		Util.makeImageFrame(Util.matToImage(imgDiff))
 		
+		val borderOfs = new Point(-128, -128)
+		val boxesImg = Mat.zeros(srcImg.size, srcImg.`type`)
+		val griddedBoxesImg = Mat.zeros(LDrawGridify.snapSizeToGrid(srcImg.size), srcImg.`type`)
+		val griddedContents = imgContents.map{
+			case(labelName, boxes) =>
+				(labelName -> boxes.map{
+					case(box, obj) => 
+						val griddedObj = new Mat
+						Imgproc.resize(obj, griddedObj, LDrawGridify.snapSizeToGrid(obj.size))
+						val grabBox = Util.calcGrabBox(box, griddedObj.size)
+						(LDrawGridify.snapRectToGrid(new Rect(ofsPoint(grabBox.tl, borderOfs), griddedObj.size)), griddedObj)
+				})
+		}
+		
+		showObjectBorders(boxesImg, imgContents.map{
+			case(labelName, boxes) =>
+				(labelName -> boxes.map{
+					case(box, obj) => 
+						val grabBox = Util.calcGrabBox(box, Util.bestBoundsBucket(box, boundBuckets))
+						(new Rect(ofsPoint(grabBox.tl, borderOfs), grabBox.size), obj)
+				})
+		})
+		showObjectBorders(griddedBoxesImg, griddedContents)
+		
+		Util.makeImageFrame(Util.matToImage(boxesImg), "boxes")
+		Util.makeImageFrame(Util.matToImage(griddedBoxesImg), "gridded boxes")
+		
+		val griddedImg = new Mat(LDrawGridify.snapSizeToGrid(srcImg.size), srcImg.`type`)
+		val griddedClusteredContents = clusteredContents.map{
+			case(labelName, cluster) => (labelName -> cluster.map{
+				case(clusterNum, (obj, instances)) => 
+					val griddedObj = new Mat
+					Imgproc.resize(obj, griddedObj, LDrawGridify.snapSizeToGrid(obj.size))
+					(clusterNum,  (griddedObj, instances.map{
+						rect =>
+							val grabBox = Util.calcGrabBox(rect, griddedObj.size)
+							LDrawGridify.snapRectToGrid(new Rect(ofsPoint(grabBox.tl, borderOfs), griddedObj.size))}))
+			})
+		}
+		Imgproc.resize(srcImg, griddedImg, griddedImg.size)
+		showAvgObjects(griddedImg, griddedClusteredContents, new Point(0, 0))
+		Util.makeImageFrame(Util.matToImage(griddedImg))
 		
 		/*
 		val image = Highgui.imread(args(0), Highgui.CV_LOAD_IMAGE_GRAYSCALE)

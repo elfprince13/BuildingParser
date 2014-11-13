@@ -82,15 +82,55 @@ object Util {
 		clusterAssignments
 	}
 	
+	
+	def checkContains(r1:Rect, r2:Rect):Option[Rect] = {
+		val x_tl = Math.max(r1.tl.x, r2.tl.x)
+		val y_tl = Math.max(r1.tl.y, r2.tl.y)
+		val x_br = Math.max(r1.br.x, r2.br.x)
+		val y_br = Math.max(r1.br.y, r2.br.y)
+		if(x_tl < x_br && y_tl < y_br){
+			Some(new Rect(new Point(x_tl, y_tl), new Point(x_br - x_tl, y_br - y_tl)))
+		} else {
+			None
+		}
+	}
+	
+	
+	def checkAllInside(perim:Rect, objs:List[Rect]) = {
+		objs.forall{ obj => checkContains(perim, obj) match {
+			case Some(intersection) => intersection.equals(obj)
+			case None => false
+		}}
+	}
+	
+	def findAllIntersections(objs:List[Rect]):List[Rect] = {
+			objs.view.zipWithIndex.map{
+				case(obj1, i) => 
+					objs.view.take(i - 1).map{
+						obj2 => checkContains(obj1, obj2)
+					}
+			}.flatten.filter(_ match {
+				case Some(r) => true
+				case None => false
+			}).map(_ match {
+				case Some(r) => r
+				case None => throw new IllegalStateException("Nones should have been filtered already")
+			}).toList
+	}
+	
 	def calcBandwidth(data:DataSet, scale:Double):Double = {
 		val vecs = data.getDataVectors().asScala
 		var distCounter = 0.
-		for(i <- 0 until vecs.size; j <- 0 until i){
-			val distUpd = vecs(i).subtract(vecs(j)).pNorm(2)
-			distCounter += distUpd
-			//Console.println(distUpd)
+		if(vecs.size > 1){
+			for(i <- 0 until vecs.size; j <- 0 until i){
+				val distUpd = vecs(i).subtract(vecs(j)).pNorm(2)
+				distCounter += distUpd
+				//Console.println(distUpd)
+			}
+			distCounter /= (vecs.length * (vecs.length - 1) / 2)
+		} else {
+			distCounter = 1 // doesn't matter nothing to check against
 		}
-		distCounter /= (vecs.length * (vecs.length - 1) / 2)
 		(distCounter * scale)
 	}
 	
