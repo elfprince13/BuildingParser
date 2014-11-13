@@ -9,10 +9,14 @@ import oscar.cp.modeling._
 import oscar.cp.core._
 
 class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridStep:(Int, Int)) extends CPModel {
+	val dims = List("x","y")
 	def zpInt() = { CPIntVar(0 to Int.MaxValue)}
 	def snapX(v:CPIntVar) = snapConstraint(v, gridStep._1)
 	def snapY(v:CPIntVar) = snapConstraint(v, gridStep._2)
 	def snapConstraint(v:CPIntVar, step:Int) = { (v % step == 0) }
+	def sideLen(box:Map[String,CPIntVar],dim:String):CPIntVar = {
+		box(dim+"Max") - box(dim+"Min")
+	}
 	val boundaryTargets:Map[String,Int] = Map(
 			"xMin" -> 0, 
 			"yMin" -> 0, 
@@ -93,6 +97,18 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 		}
 	}
 	
+	def equalDimsInCluster(clusterBoxes:List[Map[String,CPIntVar]]) = {
+		if(clusterBoxes.size > 1) {
+			// Rely on transitivity here
+			// Only need O(n) constraints, not O(n^2)
+			clusterBoxes.reduceLeft{
+				(l, r) =>
+					dims.foreach(dim => add(sideLen(l,dim) == sideLen(r,dim)))
+					r
+			}
+		}
+	}
+	
 	def addAllConstraints() = {
 		Console.println("Initializing constraints")
 		Console.println("\tForce no inside-out boxes")
@@ -103,6 +119,13 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 		noIntersections()
 		Console.println("\tForce to grid")
 		snappedToGrid()
+		Console.println("\tForcing equal dims for each cluster")
+		objVars.foreach{
+			case(labelName,clusters) => 
+				clusters.foreach{ 
+					case(clusterNumber, boxes) =>
+						Console.println("\t\t" + labelName + " " + clusterNumber)
+						equalDimsInCluster(boxes)}}
 	}
 	
 	def buildObjective() = {
