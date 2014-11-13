@@ -3,9 +3,11 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/OscaR"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/BURLAP"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/OpenCV"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/Apache Commons IO"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JSAT"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/scala pickling"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -115,7 +115,7 @@ class FindObjectKinds(img:Mat) {
 					resMap + (inst._2 -> updCluster)
 			}.map{
 				case(clusterNum,cluster) =>
-					val fillVal = 1. / cluster._2.size
+					val fillVal = 1.0 / cluster._2.size
 					val fill = new Array[Double](cluster._1.channels)
 					(0 until fill.length).foreach{ i => fill(i) = fillVal}
 					val clustScale = new Mat(cluster._1.size, CvType.CV_32FC(cluster._1.channels), new Scalar(fill))

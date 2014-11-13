@@ -12,13 +12,14 @@ import org.opencv.core.Rect
 import org.opencv.core.Point
 import scala.collection.SeqView
 import org.apache.commons.io.IOUtils
-import scala.util.Marshal
+import scala.pickling._
+import binary._
 
 class SVMDetector(svmName:String, hogsUsed:List[HOGDescriptor], histogramName:String = "", histogramThreshold:Int = 1) {
 	val histogram = if(histogramName != ""){
 		Console.println("Restricting hogsUsed by example-histogram with threshold: " + histogramThreshold)
-		val in = new java.io.FileInputStream(histogramName)
-		Marshal.load[Map[(Double,Double),Int]](IOUtils.toByteArray(in)).map(p => new Size(p._1._1, p._1._2) -> p._2)
+		val in = new java.io.FileInputStream(histogramName)		
+		IOUtils.toByteArray(in).unpickle[Map[(Double,Double),Int]].map(p => new Size(p._1._1, p._1._2) -> p._2)
 	} else { null }
 	val hogBuckets = (hogsUsed.view.filter(hog => (histogram == null) || 
 			(histogram.getOrElse(hog.get_winSize,0) > histogramThreshold)).map{hog => 

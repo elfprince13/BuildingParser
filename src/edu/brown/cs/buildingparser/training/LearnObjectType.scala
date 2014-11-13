@@ -11,7 +11,8 @@ import org.opencv.core.MatOfFloat
 import scala.actors.Actor
 import scala.actors.Channel
 import org.opencv.core.Size
-import scala.util.Marshal
+import scala.pickling._
+import binary._
 import scala.io.Source
 import org.apache.commons.io.IOUtils
 
@@ -89,8 +90,10 @@ class LearnObjectType(className:String, objDir:String, objAntiDir:String, counte
 			}
 		}
 		val out = new java.io.FileOutputStream("trained-svms" + File.separator + className + "-posExSizes.histogram")
-		val serMap = hist.map(p => (p._1.width, p._1.height) -> p._2)
-		IOUtils.write(Marshal.dump(serMap),out)
+		val serMap:Map[(Double,Double),Int] = hist.map(p => (p._1.width, p._1.height) -> p._2)
+		
+		val pckld = serMap.pickle.value //HistogramIO.saveHist(serMap).value
+		IOUtils.write(pckld,out)
 		
 	}
 	

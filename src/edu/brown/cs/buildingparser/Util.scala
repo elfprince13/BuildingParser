@@ -120,7 +120,7 @@ object Util {
 	
 	def calcBandwidth(data:DataSet, scale:Double):Double = {
 		val vecs = data.getDataVectors().asScala
-		var distCounter = 0.
+		var distCounter = 0.0
 		if(vecs.size > 1){
 			for(i <- 0 until vecs.size; j <- 0 until i){
 				val distUpd = vecs(i).subtract(vecs(j)).pNorm(2)
