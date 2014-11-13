@@ -94,11 +94,27 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 	}
 	
 	def addAllConstraints() = {
+		Console.println("Initializing constraints")
+		Console.println("\tForce no inside-out boxes")
 		boxesNotInsideOut()
+		Console.println("\tForce to interior")
 		boxesInsideBoundary()
+		Console.println("\tForce no intersections")
 		noIntersections()
+		Console.println("\tForce to grid")
 		snappedToGrid()
 	}
+	
+	def buildObjective() = {
+		
+	}
+	
+	def trySolve() = {
+		
+	}
+	
+	addAllConstraints()
+	val objectiveFunction = buildObjective()
 	
 }
 
