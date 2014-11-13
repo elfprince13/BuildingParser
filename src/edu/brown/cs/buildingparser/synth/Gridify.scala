@@ -5,6 +5,103 @@ import org.opencv.core.Point
 import org.opencv.core.Rect
 import edu.brown.cs.buildingparser.Util
 
+import oscar.cp.modeling._
+import oscar.cp.core._
+
+class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridStep:(Int, Int)) extends CPModel {
+	def zpInt() = { CPIntVar(0 to Int.MaxValue)}
+	def snapX(v:CPIntVar) = snapConstraint(v, gridStep._1)
+	def snapY(v:CPIntVar) = snapConstraint(v, gridStep._2)
+	def snapConstraint(v:CPIntVar, step:Int) = { (v % step == 0) }
+	val boundaryTargets:Map[String,Int] = Map(
+			"xMin" -> 0, 
+			"yMin" -> 0, 
+			"xMax" -> boundary.width.intValue, 
+			"yMax" -> boundary.height.intValue)
+	val boundaryVars:Map[String,CPIntVar] = Map(
+			"xMax" -> zpInt,
+			"yMax" -> zpInt)
+	
+	val objTargets:Map[String,Map[Int,List[Map[String,Int]]]] = objs.map{
+		case(labelName,clusters) => (labelName -> clusters.map{ 
+			case(clusterNumber, boxes) => (clusterNumber -> boxes.map{
+				box => Map(
+					"xMin" -> box.tl.x.intValue,
+					"yMin" -> box.tl.y.intValue,
+					"xMax" -> box.br.x.intValue,
+					"yMax" -> box.br.y.intValue)})})}
+	
+	val objVars = objTargets.map{
+		case(labelName,clusters) => (labelName -> clusters.map{ 
+			case(clusterNumber, boxes) => (clusterNumber -> 
+			boxes.map( box => box.map{case(varName,_) => (varName -> zpInt)}))})}
+	
+	def objStream() = {
+		objVars.view.map{
+			case(labelName,clusters) => clusters.view.map{ 
+				case(clusterNumber, boxes) => 
+					boxes.view}.flatten }.flatten
+	}
+	
+	def boxesNotInsideOut() = {
+		objStream.foreach{
+			box =>
+				add(box("xMin") <= box("xMax"))
+				add(box("yMin") <= box("yMax"))
+		}
+	}
+	
+	def boxesInsideBoundary() = {
+		objStream.foreach{
+			box =>
+				add(box("xMin") >= boundaryTargets("xMin"))
+				add(box("yMin") >= boundaryTargets("yMin"))
+				add(box("xMax") <= boundaryVars("xMax"))
+				add(box("yMax") <= boundaryVars("yMax"))
+		}
+	}
+	
+	def noIntersections() = {
+		objStream.toStream.zipWithIndex.foreach{
+			case(oBox,i) =>
+				objStream.take(i - 1).foreach{
+					case(iBox) =>
+						val xIntersection = (
+								(oBox("xMin") <== iBox("xMin")) && 
+								(iBox("xMin") <<= oBox("xMax"))) || 
+								((iBox("xMin") <== oBox("xMin")) && 
+										(oBox("xMin") <<= iBox("xMax")))
+						val yIntersection = (
+								(oBox("yMin") <== iBox("yMin")) && 
+								(iBox("yMin") <<= oBox("yMax"))) || 
+								((iBox("yMin") <== oBox("yMin")) && 
+										(oBox("yMin") <<= iBox("yMax")))
+						add(!(xIntersection) || !(yIntersection) )
+				}
+		}
+	}
+	
+	def snappedToGrid() = {
+		add(snapX(boundaryVars("xMax")))
+		add(snapY(boundaryVars("yMax")))
+		objStream.foreach{
+			case(box) =>
+				add(snapX(box("xMin")))
+				add(snapY(box("yMin")))
+				add(snapX(box("xMax")))
+				add(snapY(box("yMax")))
+		}
+	}
+	
+	def addAllConstraints() = {
+		boxesNotInsideOut()
+		boxesInsideBoundary()
+		noIntersections()
+		snappedToGrid()
+	}
+	
+}
+
 /***********
  * 
  * A standard minifig-door is:
@@ -22,7 +119,6 @@ import edu.brown.cs.buildingparser.Util
  ***********/
 
 object LDrawGridify extends Gridify((15,8), (20,8))
-
 
 class Gridify(pixel2GridRatio:(Int,Int), gridStep:(Int, Int)) {
 	
