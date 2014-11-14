@@ -286,7 +286,7 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 							box => 
 								val outRect = new Rect(
 										new Point(box("xMin").value, box("yMin").value),
-										new Point(box("xMin").value + dCVs("xSz").value - 1, box("yMin").value + dCVs("ySz").value - 1)) 
+										new Size(dCVs("xSz").value, dCVs("ySz").value)) 
 								Console.println("\t" + outRect)
 								outRect
 						})})}

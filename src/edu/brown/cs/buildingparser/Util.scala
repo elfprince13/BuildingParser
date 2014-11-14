@@ -29,6 +29,25 @@ import org.opencv.core.MatOfPoint
 import jsat.DataSet
 
 object Util {
+	/*
+	def drawSubRect(img:Mat, rect:Rect, color:Scalar, fill:Boolean = false):Unit = {
+		if(fill){
+			val fMat = new Mat(rect.size, img.`type`, color)
+			fMat.copyTo(img.submat(rect))
+		} else {
+			val cRect = new Rect(rect.tl, new Size(1, rect.height))
+			val cMat = new Mat(rect.height.intValue, 1, img.`type`, color)
+			val rRect = new Rect(rect.tl, new Size(rect.width,1))
+			val rMat = new Mat(1, rect.width.intValue, img.`type`, color)
+			cMat.copyTo(img.submat(cRect))
+			rMat.copyTo(img.submat(rRect))
+		}
+	}
+	*/
+	def scalarAdd(s1:Scalar, s2:Scalar) = {
+		val nV = (s1.`val` zip s2.`val`).map{case(d1, d2) => d1 + d2}
+		new Scalar(nV)
+	}
 	
 	def calcGrabBox(box:Rect, bounds:Size):Rect = {
 		val grabW = bounds.width.toInt

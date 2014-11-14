@@ -41,7 +41,7 @@ object Main {
 		contents.foreach{
 			case(labelName, objs) => objs.foreach{
 					case(box, subImg) => 
-						Core.rectangle(image, box.tl, box.br, SamplerMain.stdLabelProps(labelName)._1)
+						Core.rectangle(image, box.tl, ofsPoint(box.br, new Point(-1, -1)), SamplerMain.stdLabelProps(labelName)._1)
 				}
 		}
 	}
@@ -172,9 +172,9 @@ object Main {
 			showObjectBorders(griddedBoxesImg, griddedContents)
 			
 			val stripper = new DPSubdivider(LDrawGridify.gridStep)
-			val regions = stripper.getNonObjRegions(new Rect(new Point(0,0),solver.getSolvedBoundary), stripper.sortObjs(griddedClusteredContents.values.flatMap(_.values.flatten).toList))
+			val regions = stripper.getNonObjRegions(new Rect(new Point(0,0),solver.getSolvedBoundary), stripper.sortObjs(griddedClusteredContents.values.flatMap(_.values.flatten).toList))//, Some(griddedBoxesImg))
 			regions.foreach{
-				region => Core.rectangle(griddedBoxesImg, region.tl, region.br, new Scalar(rg.nextInt(256), rg.nextInt(256), rg.nextInt(256)), -1)
+				region => Core.rectangle(griddedBoxesImg, region.tl, ofsPoint(region.br, new Point(-1, -1)), new Scalar(rg.nextInt(256), rg.nextInt(256), rg.nextInt(256)), -1)
 			}
 			Util.makeImageFrame(Util.matToImage(boxesImg), "boxes")
 			Util.makeImageFrame(Util.matToImage(griddedBoxesImg), "gridded boxes")
