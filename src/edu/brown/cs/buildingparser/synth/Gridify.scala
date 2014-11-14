@@ -7,6 +7,8 @@ import edu.brown.cs.buildingparser.Util
 import oscar.cp.modeling._
 import oscar.cp.core._
 import scala.util.Random
+import oscar.cp.constraints.GrEq
+import oscar.cp.constraints.LeEq
 
 class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridStep:(Int, Int)) extends CPModel {
 	var solved = false
@@ -96,13 +98,16 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 	}
 	
 	def boxesInsideBoundary():List[Constraint] = {
-		objStream.view.map{
-			box =>
-				Stream(
-						(box("xMin") >= boundaryTargets("xMin")),
-						(box("yMin") >= boundaryTargets("yMin")),
-						(box("xMax") <= boundaryVars("xMax")),
-						(box("yMax") <= boundaryVars("yMax")))
+		val boundDirs = List((classOf[Int], "Min", (x:CPIntVar,y:Int) => new GrEq(x,y), boundaryTargets), (classOf[CPIntVar], "Max", (x:CPIntVar,y:CPIntVar) => new LeEq(x,y), boundaryVars))
+		dims.view.map{
+			dim => boundDirs.view.map{
+				case(classN, bound, cmp, boundMap) =>
+					val bvn = dim + bound
+					val varVs = objStream.view.map( box => box(bvn)).toArray
+					val varVIdxes = CPIntVar(0 until varVs.length)
+					cmp(varVs(varVIdxes), boundMap(bvn).asInstanceOf[CPIntVar with Int])
+			}
+				
 		}.flatten.toList
 	}
 	
@@ -127,39 +132,14 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 		}.flatten.toList
 	}
 	
-	/*
-	def snappedToGrid() = {
-		add(snapX(boundaryVars("xMax")))
-		add(snapY(boundaryVars("yMax")))
-		objStream.foreach{
-			case(box) =>
-				add(snapX(box("xMin")))
-				add(snapY(box("yMin")))
-				add(snapX(box("xMax")))
-				add(snapY(box("yMax")))
-		}
-	}
-	*/
-	
 	def equalDimsInCluster(clusterBoxes:List[Map[String,CPIntVar]]):List[Constraint] = {
 		if(clusterBoxes.size > 1) {
-			// Rely on transitivity here
-			// Only need O(n) constraints, not O(n^2)
-			
 			dims.map{
 				dim => 
 					val sideLens = clusterBoxes.view.map( box => sideLen(box, dim)).toArray
 					val sideIdxes = CPIntVar(1 until sideLens.length)
 					(sideLens(sideIdxes) == sideLens(0))		
 			}
-			
-			/*
-			clusterBoxes.reduceLeft{
-				(l, r) =>
-					dims.foreach(dim => add(sideLen(l,dim) == sideLen(r,dim)))
-					r
-			}
-			*/
 		} else {
 			List()
 		}
