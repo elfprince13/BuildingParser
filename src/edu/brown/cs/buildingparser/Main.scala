@@ -147,7 +147,7 @@ object Main {
 		}
 		
 		val solver = new ObjConstraints(griddedBounds, griddedBoxes, LDrawGridify.gridStep)
-		val stats = solver.trySolve()
+		val stats = solver.trySolve(runs = 300, fails = 600, prob = 80)
 		//Console.println(stats)
 		if(solver.solved){
 			showObjectBorders(boxesImg, imgContents.map{

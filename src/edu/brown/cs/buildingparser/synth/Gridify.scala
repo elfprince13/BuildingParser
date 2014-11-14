@@ -16,9 +16,11 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 	final val globalMaxVal = (2 * Math.max(boundary.width, boundary.height)).intValue
 	def zpIntX(maxN:Int = globalMaxVal) = zpInt(maxN, gridStep._1)
 	def zpIntY(maxN:Int = globalMaxVal) = zpInt(maxN, gridStep._2)
-	def zpInt(maxN:Int = globalMaxVal, byN:Int = 1) = { CPIntVar((0 until maxN by byN).toSet )}
-	Console.println((0 until (2 * Math.max(boundary.width, boundary.height)).intValue by gridStep._1))
-	Console.println((0 until (2 * Math.max(boundary.width, boundary.height)).intValue by gridStep._2))
+	def zpInt(maxN:Int = globalMaxVal, byN:Int = 1) = { 
+		val drawnFrom = (0 until maxN by byN).toSet
+		Console.println("Drawing from: " + drawnFrom)
+		CPIntVar(drawnFrom )
+	}
 	
 	def snapByName(v:Int, name:String) = {
 		if(name(0) == 'x'){
@@ -31,7 +33,11 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 	}
 	def snapX(v:Int) = snapVal(v, gridStep._1)
 	def snapY(v:Int) = snapVal(v, gridStep._2)
-	def snapVal(v:Int, step:Int) = { ((v.doubleValue / step).round * step).intValue }
+	def snapVal(v:Int, step:Int) = { 
+		val out = ((v.doubleValue / step).round * step).intValue
+		Console.println(v + " snapped to " + out + " (by " + step + ")")
+		out
+	}
 	
 	def sideLen(box:Map[String,CPIntVar],dim:String):CPIntVar = {
 		box(dim+"Max") - box(dim+"Min")
@@ -47,37 +53,58 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 			"xMax" -> zpIntX(globalMaxVal),
 			"yMax" -> zpIntY(globalMaxVal))
 	
+	val objDTargets:Map[String,Map[Int,Map[String,Int]]] = objs.map{
+		case(labelName,clusters) => (labelName -> clusters.map{
+			case(clusterNumber, boxes) =>
+				val fBox = boxes(0)
+				val clusterData = Map(
+						"xSz" -> fBox.width.intValue,
+						"ySz" -> fBox.height.intValue
+						)
+				(clusterNumber -> clusterData)
+		})
+	}
+	
 	val objTargets:Map[String,Map[Int,List[Map[String,Int]]]] = objs.map{
 		case(labelName,clusters) => (labelName -> clusters.map{ 
 			case(clusterNumber, boxes) => 
 				Console.println(labelName + " " + clusterNumber)
 				(clusterNumber -> boxes.map{
-				box =>  
-					Console.println("\t" + box)
-					Map(
-					"xMin" -> box.tl.x.intValue,
-					"yMin" -> box.tl.y.intValue,
-					"xMax" -> box.br.x.intValue,
-					"yMax" -> box.br.y.intValue)})})}
+					box =>  
+						Console.println("\t" + box)
+						Map("xMin" -> box.tl.x.intValue,
+							"yMin" -> box.tl.y.intValue)})})}
+	
+	val objDVars = objDTargets.map{
+		case(labelName,clusters) => (labelName -> clusters.map{
+			case(clusterNumber, box) => (clusterNumber -> 
+			box.map{ case(varName, targ) =>
+				val dim = varName(0)
+				val varV = if(dim == 'x'){ zpIntX(2 * targ) } else if(dim == 'y') { zpIntY(2 * targ) } else { throw new IllegalStateException("unknown dim value")}
+				(varName -> varV)})})}
 	
 	val objVars = objTargets.map{
 		case(labelName,clusters) => (labelName -> clusters.map{ 
 			case(clusterNumber, boxes) => (clusterNumber -> 
 			boxes.map( box => box.map{case(varName,targ) => 
 				val dim = varName(0)
-				val varV = if(dim == 'x'){ zpIntX(2 * targ) } else { zpIntY(2 * targ) }
+				val varV = if(dim == 'x'){ zpIntX(2 * targ) } else if(dim == 'y') { zpIntY(2 * targ) } else { throw new IllegalStateException("unknown dim value")}
 				(varName -> varV)}))})}
 	
 	def objVTStream() = {
 		objVars.view.map{
 			case(labelName,labelVars) =>
 				val labelTargets = objTargets(labelName)
+				val dLTs = objDTargets(labelName)
+				val dLVs = objDVars(labelName)
 				labelVars.view.map{
 					case(clustNum, clusterVars) =>
 						val clusterTargets = labelTargets(clustNum)
+						val dCTs = dLTs(clustNum)
+						val dCVs = dLVs(clustNum)
 						(clusterVars.toStream zip clusterTargets.toStream).view.map{
 							case(boxVars, boxTargets) => 
-								val outPair = (boxVars, boxTargets)
+								val outPair = (boxVars ++ dCVs, boxTargets ++ dCTs)
 								outPair
 						}
 				}.flatten
@@ -86,28 +113,30 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 	
 	def objStream() = {
 		objVars.view.map{
-			case(labelName,clusters) => clusters.view.map{ 
-				case(clusterNumber, boxes) => 
-					boxes.view}.flatten }.flatten
-	}
-	
-	def boxesNotInsideOut():List[Constraint] = {
-		objStream.view.map{
-			box => dims.view.map(dim => (box(dim + "Min") <= box(dim + "Max")))
-		}.flatten.toList
+			case(labelName,clusters) => 
+				val dLVs = objDVars(labelName)
+				clusters.view.map{
+					case(clusterNumber, boxes) =>
+						val dCVs = dLVs(clusterNumber)
+						boxes.view.map(_ ++ dCVs)}.flatten }.flatten
 	}
 	
 	def boxesInsideBoundary():List[Constraint] = {
-		val boundDirs = List((classOf[Int], "Min", (x:CPIntVar,y:Int) => new GrEq(x,y), boundaryTargets), (classOf[CPIntVar], "Max", (x:CPIntVar,y:CPIntVar) => new LeEq(x,y), boundaryVars))
 		dims.view.map{
-			dim => boundDirs.view.map{
-				case(classN, bound, cmp, boundMap) =>
-					val bvn = dim + bound
-					val varVs = objStream.view.map( box => box(bvn)).toArray
-					val varVIdxes = CPIntVar(0 until varVs.length)
-					cmp(varVs(varVIdxes), boundMap(bvn).asInstanceOf[CPIntVar with Int])
-			}
+			dim =>
+				// attempt to abstract over the two types of comparisons here went badly
+				// because of the typing differences
+				val minName = dim + "Min"
+				val minVs = objStream.view.map( box => box(minName)).toArray
+				val minVIdxes = CPIntVar(0 until minVs.length)
+				val minC = minVs(minVIdxes) >= boundaryTargets(minName)
 				
+				val szName = dim + "Sz"
+				val maxName = dim + "Max"
+				val maxVs = objStream.view.map( box => box(szName) + box(minName)).toArray
+				val maxVIdxes = CPIntVar(0 until maxVs.length)
+				val maxC = maxVs(maxVIdxes) < boundaryTargets(maxName)
+			Stream(minC, maxC)	
 		}.flatten.toList
 	}
 	
@@ -116,42 +145,24 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 			case(oBox,i) =>
 				objStream.view.take(i - 1).map{
 					case(iBox) =>
+						val oBxMax = oBox("xMin") + oBox("xSz")
+						val oByMax = oBox("yMin") + oBox("ySz")
+						val iBxMax = iBox("xMin") + iBox("xSz")
+						val iByMax = iBox("yMin") + iBox("ySz")
 						val xIntersection = (
 								(oBox("xMin") <== iBox("xMin")) && 
-								(iBox("xMin") <<= oBox("xMax"))) || 
+								(iBox("xMin") <<= oBxMax)) || 
 								((iBox("xMin") <== oBox("xMin")) && 
-										(oBox("xMin") <<= iBox("xMax")))
+										(oBox("xMin") <<= iBxMax))
 						val yIntersection = (
 								(oBox("yMin") <== iBox("yMin")) && 
-								(iBox("yMin") <<= oBox("yMax"))) || 
+								(iBox("yMin") <<= oByMax)) || 
 								((iBox("yMin") <== oBox("yMin")) && 
-										(oBox("yMin") <<= iBox("yMax")))
+										(oBox("yMin") <<= iByMax))
 						val noIntersection = (!(xIntersection) || !(yIntersection) )
 						noIntersection.constraintTrue
 				}
 		}.flatten.toList
-	}
-	
-	def equalDimsInCluster(clusterBoxes:List[Map[String,CPIntVar]]):List[Constraint] = {
-		if(clusterBoxes.size > 1) {
-			dims.map{
-				dim => 
-					val sideLens = clusterBoxes.view.map( box => sideLen(box, dim)).toArray
-					val sideIdxes = CPIntVar(1 until sideLens.length)
-					(sideLens(sideIdxes) == sideLens(0))		
-			}
-		} else {
-			List()
-		}
-	}
-	
-	def equalDims():List[Constraint] = {
-		objVars.view.map{
-			case(labelName,clusters) => 
-				clusters.view.map{ 
-					case(clusterNumber, boxes) =>
-						Console.println("\t\t" + labelName + " " + clusterNumber)
-						equalDimsInCluster(boxes)}.flatten}.flatten.toList
 	}
 	
 	def boundaryPositive():List[Constraint] = {
@@ -159,23 +170,19 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 				(boundaryVars("yMax") > boundaryTargets("yMin")))
 	}
 	
-	private def addAllConstraints() = {
+	private def makeAllConstraints() = {
 		Console.println("Initializing constraints")
 		Console.println("\tForce no degenerate boundary")
-		add(boundaryPositive())
-		Console.println("\tForce no inside-out boxes")
-		add(boxesNotInsideOut())
+		val bPCons = boundaryPositive()
+		
 		Console.println("\tForce to interior")
-		add(boxesInsideBoundary())
+		val bIBCons = boxesInsideBoundary()
+		
 		Console.println("\tForce no intersections")
-		add(noIntersections())
-		//Console.println("\tForce to grid")
-		//snappedToGrid()
+		val bNICons = noIntersections()
 
-		Console.println("\tForcing equal dims for each cluster")
-		add(equalDims())
-						
-						
+		val allCons = bPCons ++ bIBCons ++ bNICons				
+		allCons
 	}
 	
 	def sideLengthObjectives(boxVars:Map[String,CPIntVar], boxTargets:Map[String,Int]):List[CPIntVar] = {
@@ -191,9 +198,9 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 		val boxCents:List[CPIntVar] = dims.map{
 			dim => 
 				val dMinV = boxVars(dim + "Min")
-				val dMaxV = boxVars(dim + "Max")
+				val dMaxV = dMinV + boxVars(dim + "Sz")
 				val dMinT = boxTargets(dim + "Min")
-				val dMaxT = boxTargets(dim + "Max")
+				val dMaxT = dMinT + boxTargets(dim + "Sz")
 				val centV:CPIntVar = (dMinV + dMaxV)
 				val centT = (dMinT + dMaxT)
 				(centV - centT).abs
@@ -203,27 +210,28 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 	
 	def buildObjective():CPIntVar = {
 		val boxSideObjectives = objVTStream.map{
-			case(boxVars, boxTargets) => sideLengthObjectives(boxVars, boxTargets)
+			case(boxVars, boxTargets) => sideLengthObjectives(boxVars.filterKeys(_.endsWith("Sz")), boxTargets.filterKeys(_.endsWith("Sz")))
 		}.flatten.toList
 		
 		val boxCentObjectives = objVTStream.map{
 			case(boxVars, boxTargets) => centerObjectives(boxVars, boxTargets)
 		}.flatten.toList
 		val allObjectives:List[CPIntVar] = sideLengthObjectives(boundaryVars, boundaryTargets) ++ boxSideObjectives ++ boxCentObjectives
-		
 		allObjectives.reduceLeft((a,b) => a + b)
 	}
 	
 	def initializeVars() = {
-		List(	(boundaryVars("xMax") == snapX(boundaryTargets("xMax"))),
-				(boundaryVars("yMax") == snapX(boundaryTargets("yMax")))) ++
+		val varStream = 
+		(Stream((boundaryVars("xMax") == snapX(boundaryTargets("xMax"))),
+				(boundaryVars("yMax") == snapY(boundaryTargets("yMax")))) ++
 		objVTStream.map{
 			case(vars, targs) =>
 				vars.view.map{
 					case(varN, varV) =>
-						(varV == snapByName(targs(varN),varN))
+						(varV == snapByName(targs(varN),varN)) // might get some duplicates here, but should be okay, since it'll be the same assignment
 				}
-		}.flatten.toList
+		}.flatten)
+		varStream.toList
 	}
 	
 	def trySolve(runs:Int = 300, fails:Int = 60, prob:Int = 50) = {
@@ -236,10 +244,14 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 			binaryFirstFail(probVars)
 		} onSolution {
 			Console.println("Solution found")
+			/*probVars.zipWithIndex.foreach{
+				case(v,i) => Console.println("\t => v(" + i + ") = " + v +","+v.value)
+			}*/
 			(0 until numVars).foreach(i => bestSol(i) = probVars(i).value)
 			solved = true
 		}
 		var stats = /*start(nSols = 1)*/startSubjectTo(nSols = 1){
+			add(allCons)
 			add(initializeVars())
 		}
 		Console.println(stats)
@@ -247,25 +259,37 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 		for(r <- 1 to runs){
 			Console.println("Performing next run: " + r)
 			stats = startSubjectTo(failureLimit = fails){
+				add(allCons)
 				add((0 until numVars).filter(i => rand.nextInt(100) < prob).map(i => probVars(i) == bestSol(i)))
 			}
 			Console.println(stats)
+		}
+		Console.println("Search complete. Found: ")
+		bestSol.zipWithIndex.foreach{
+			case(b, i) => probVars(i).assign(b)
+		}
+		probVars.zipWithIndex.foreach{
+			case(v,i) => Console.println("\t => v(" + i + ") = " + v.value)
 		}
 		stats
 	}
 	
 	def getSolvedObjs() = {
 		objVars.map{
-			case(labelName,clusters) => (labelName -> clusters.map{ 
-				case(clusterNumber, boxes) => 
-					Console.println(labelName + " " + clusterNumber + " (out)")
-					(clusterNumber -> boxes.map{
-						box => 
-							val outRect = new Rect(	new Point(box("xMin").value, box("yMin").value),
-									new Point(box("xMax").value, box("yMax").value)) 
-							Console.println("\t" + outRect)
-							outRect
-					})})}
+			case(labelName,clusters) => 
+				val dLVs = objDVars(labelName)
+				(labelName -> clusters.map{ 
+					case(clusterNumber, boxes) => 
+						val dCVs = dLVs(clusterNumber)
+						Console.println(labelName + " " + clusterNumber + " (out)")
+						(clusterNumber -> boxes.map{
+							box => 
+								val outRect = new Rect(
+										new Point(box("xMin").value, box("yMin").value),
+										new Size(dCVs("xSz").value, dCVs("ySz").value)) 
+								Console.println("\t" + outRect)
+								outRect
+						})})}
 	}
 	
 	def getSolvedBoundary() = {
@@ -274,8 +298,8 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 		outSize
 	}
 	
-	addAllConstraints()
-	val objectiveFunction = buildObjective()
+	val allCons = makeAllConstraints
+	val objectiveFunction = buildObjective
 	
 }
 
