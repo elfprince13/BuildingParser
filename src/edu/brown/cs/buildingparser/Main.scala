@@ -25,6 +25,7 @@ import org.opencv.imgproc.Imgproc
 import org.opencv.core.Rect
 import org.opencv.core.Point
 import edu.brown.cs.buildingparser.synth.LDrawGridify
+import edu.brown.cs.buildingparser.synth.ObjConstraints
 
 object Main {
 	def jDL(l:List[Double]):java.util.List[java.lang.Double] = {
@@ -121,46 +122,62 @@ object Main {
 		
 		val borderOfs = new Point(-128, -128)
 		val boxesImg = Mat.zeros(srcImg.size, srcImg.`type`)
-		val griddedBoxesImg = Mat.zeros(LDrawGridify.snapSizeToGrid(srcImg.size), srcImg.`type`)
-		val griddedContents = imgContents.map{
-			case(labelName, boxes) =>
-				(labelName -> boxes.map{
-					case(box, obj) => 
-						val griddedObj = new Mat
-						Imgproc.resize(obj, griddedObj, LDrawGridify.snapSizeToGrid(obj.size))
-						val grabBox = Util.calcGrabBox(box, griddedObj.size)
-						(LDrawGridify.snapRectToGrid(new Rect(ofsPoint(grabBox.tl, borderOfs), griddedObj.size)), griddedObj)
+		//val griddedBoxesImg = Mat.zeros(LDrawGridify.snapSizeToGrid(srcImg.size), srcImg.`type`)
+		val griddedBounds = new Size(
+				LDrawGridify.pixelsToGridUnits(srcImg.size.width.intValue),
+				LDrawGridify.pixelsToGridUnits(srcImg.size.height.intValue)
+				)
+		val griddedBoxes = clusteredContents.map{
+			case(labelName, clusters) =>
+				(labelName -> clusters.map{
+					case(clustNum, cluster) =>
+						(clustNum -> cluster._2.map{
+							box => 
+								val grabBox = Util.calcGrabBox(box, Util.bestBoundsBucket(box, boundBuckets))
+								val fixPt = ofsPoint(grabBox.tl, borderOfs)
+								val fixSz = grabBox.size
+								val nx = LDrawGridify.pixelsToGridUnits(fixPt.x.intValue)
+								val ny = LDrawGridify.pixelsToGridUnits(fixPt.y.intValue)
+								val nw = LDrawGridify.pixelsToGridUnits(fixSz.width.intValue)
+								val nh = LDrawGridify.pixelsToGridUnits(fixSz.height.intValue)
+									
+								new Rect(new Point(nx, ny), new Size(nw, nh))
+						})
 				})
 		}
 		
-		showObjectBorders(boxesImg, imgContents.map{
-			case(labelName, boxes) =>
-				(labelName -> boxes.map{
-					case(box, obj) => 
-						val grabBox = Util.calcGrabBox(box, Util.bestBoundsBucket(box, boundBuckets))
-						(new Rect(ofsPoint(grabBox.tl, borderOfs), grabBox.size), obj)
-				})
-		})
-		showObjectBorders(griddedBoxesImg, griddedContents)
-		
-		Util.makeImageFrame(Util.matToImage(boxesImg), "boxes")
-		Util.makeImageFrame(Util.matToImage(griddedBoxesImg), "gridded boxes")
-		
-		val griddedImg = new Mat(LDrawGridify.snapSizeToGrid(srcImg.size), srcImg.`type`)
-		val griddedClusteredContents = clusteredContents.map{
-			case(labelName, cluster) => (labelName -> cluster.map{
-				case(clusterNum, (obj, instances)) => 
-					val griddedObj = new Mat
-					Imgproc.resize(obj, griddedObj, LDrawGridify.snapSizeToGrid(obj.size))
-					(clusterNum,  (griddedObj, instances.map{
-						rect =>
-							val grabBox = Util.calcGrabBox(rect, griddedObj.size)
-							LDrawGridify.snapRectToGrid(new Rect(ofsPoint(grabBox.tl, borderOfs), griddedObj.size))}))
+		val solver = new ObjConstraints(griddedBounds, griddedBoxes, LDrawGridify.gridStep)
+		val stats = solver.trySolve()
+		//Console.println(stats)
+		if(solver.solved){
+			showObjectBorders(boxesImg, imgContents.map{
+				case(labelName, boxes) =>
+					(labelName -> boxes.map{
+						case(box, obj) => 
+							val grabBox = Util.calcGrabBox(box, Util.bestBoundsBucket(box, boundBuckets))
+							(new Rect(ofsPoint(grabBox.tl, borderOfs), grabBox.size), obj)
+					})
 			})
+			
+			val griddedBoxesImg = Mat.zeros(solver.getSolvedBoundary, boxesImg.`type`)
+			val griddedClusteredContents = solver.getSolvedObjs
+			val griddedContents = griddedClusteredContents.map{
+				case(labelName, clusters) =>
+					(labelName, clusters.view.map{
+						case(clustNum, boxes) => boxes.view.map(box => (box, new Mat))
+					}.flatten.toList)
+			}
+			
+			showObjectBorders(griddedBoxesImg, griddedContents)
+			
+			Util.makeImageFrame(Util.matToImage(boxesImg), "boxes")
+			Util.makeImageFrame(Util.matToImage(griddedBoxesImg), "gridded boxes")
+			
+		} else {
+			Console.println("Could not achieve a valid gridded facade.")
+			Console.println("\t=> Try adjusting the mesh resolution or deletion weights")
 		}
-		Imgproc.resize(srcImg, griddedImg, griddedImg.size)
-		showAvgObjects(griddedImg, griddedClusteredContents, new Point(0, 0))
-		Util.makeImageFrame(Util.matToImage(griddedImg))
+		
 		
 		/*
 		val image = Highgui.imread(args(0), Highgui.CV_LOAD_IMAGE_GRAYSCALE)
