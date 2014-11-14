@@ -172,7 +172,7 @@ object SamplerMain {
 	
 	val stdLabelProps = Map[String,(Scalar,Boolean)](
 						"window" -> (new Scalar(0,0,255),true),
-						"balcony" -> (new Scalar(255,0,128),true),
+						//"balcony" -> (new Scalar(255,0,128),true),
 						"door" -> (new Scalar(0,128,255),true))
 	
 	val dimBuckets = List(16, 32, 48, 64, 96, 128)	

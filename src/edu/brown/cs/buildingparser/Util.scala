@@ -86,10 +86,10 @@ object Util {
 	def checkContains(r1:Rect, r2:Rect):Option[Rect] = {
 		val x_tl = Math.max(r1.tl.x, r2.tl.x)
 		val y_tl = Math.max(r1.tl.y, r2.tl.y)
-		val x_br = Math.max(r1.br.x, r2.br.x)
-		val y_br = Math.max(r1.br.y, r2.br.y)
+		val x_br = Math.min(r1.br.x, r2.br.x)
+		val y_br = Math.min(r1.br.y, r2.br.y)
 		if(x_tl < x_br && y_tl < y_br){
-			Some(new Rect(new Point(x_tl, y_tl), new Point(x_br - x_tl, y_br - y_tl)))
+			Some(new Rect(new Point(x_tl, y_tl), new Size(x_br - x_tl, y_br - y_tl)))
 		} else {
 			None
 		}

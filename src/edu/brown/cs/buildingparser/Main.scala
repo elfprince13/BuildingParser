@@ -26,6 +26,7 @@ import org.opencv.core.Rect
 import org.opencv.core.Point
 import edu.brown.cs.buildingparser.synth.LDrawGridify
 import edu.brown.cs.buildingparser.synth.ObjConstraints
+import edu.brown.cs.buildingparser.synth.DPSubdivider
 
 object Main {
 	def jDL(l:List[Double]):java.util.List[java.lang.Double] = {
@@ -87,7 +88,7 @@ object Main {
 					defaultHog.get_cellSize, defaultHog.get_nbins))
 		
 		val grazSampler = SamplerMain.grazSampler
-		val srcHandle = grazSampler.imgHandleFromName("facade_0_0099003_0099285.png")
+		val srcHandle = grazSampler.imgHandleFromName("facade_0_0099003_0099285.png")//("facade_1_0056092_0056345.png")//
 		val labelHandle = grazSampler.pairedImgs(srcHandle)
 		val (srcBase, examples) = grazSampler.extractOneExampleSet(srcHandle, labelHandle)
 		val srcImg = Highgui.imread(srcHandle.getAbsolutePath, Highgui.CV_LOAD_IMAGE_COLOR)
@@ -147,7 +148,7 @@ object Main {
 		}
 		
 		val solver = new ObjConstraints(griddedBounds, griddedBoxes, LDrawGridify.gridStep)
-		val stats = solver.trySolve(runs = 300, fails = 600, prob = 80)
+		val stats = solver.trySolve(runs = 20, fails = 600, prob = 80)
 		//Console.println(stats)
 		if(solver.solved){
 			showObjectBorders(boxesImg, imgContents.map{
@@ -170,6 +171,11 @@ object Main {
 			
 			showObjectBorders(griddedBoxesImg, griddedContents)
 			
+			val stripper = new DPSubdivider(LDrawGridify.gridStep)
+			val regions = stripper.getNonObjRegions(new Rect(new Point(0,0),solver.getSolvedBoundary), stripper.sortObjs(griddedClusteredContents.values.flatMap(_.values.flatten).toList))
+			regions.foreach{
+				region => Core.rectangle(griddedBoxesImg, region.tl, region.br, new Scalar(rg.nextInt(256), rg.nextInt(256), rg.nextInt(256)), -1)
+			}
 			Util.makeImageFrame(Util.matToImage(boxesImg), "boxes")
 			Util.makeImageFrame(Util.matToImage(griddedBoxesImg), "gridded boxes")
 			

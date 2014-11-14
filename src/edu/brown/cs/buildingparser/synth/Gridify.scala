@@ -18,7 +18,7 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 	def zpIntY(maxN:Int = globalMaxVal) = zpInt(maxN, gridStep._2)
 	def zpInt(maxN:Int = globalMaxVal, byN:Int = 1) = { 
 		val drawnFrom = (0 until maxN by byN).toSet
-		Console.println("Drawing from: " + drawnFrom)
+		//Console.println("Drawing from: " + drawnFrom)
 		CPIntVar(drawnFrom )
 	}
 	
@@ -35,7 +35,7 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 	def snapY(v:Int) = snapVal(v, gridStep._2)
 	def snapVal(v:Int, step:Int) = { 
 		val out = ((v.doubleValue / step).round * step).intValue
-		Console.println(v + " snapped to " + out + " (by " + step + ")")
+		//Console.println(v + " snapped to " + out + " (by " + step + ")")
 		out
 	}
 	
@@ -68,10 +68,10 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 	val objTargets:Map[String,Map[Int,List[Map[String,Int]]]] = objs.map{
 		case(labelName,clusters) => (labelName -> clusters.map{ 
 			case(clusterNumber, boxes) => 
-				Console.println(labelName + " " + clusterNumber)
+				//Console.println(labelName + " " + clusterNumber)
 				(clusterNumber -> boxes.map{
 					box =>  
-						Console.println("\t" + box)
+						//Console.println("\t" + box)
 						Map("xMin" -> box.tl.x.intValue,
 							"yMin" -> box.tl.y.intValue)})})}
 	
@@ -268,9 +268,9 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 		bestSol.zipWithIndex.foreach{
 			case(b, i) => probVars(i).assign(b)
 		}
-		probVars.zipWithIndex.foreach{
+		/*probVars.zipWithIndex.foreach{
 			case(v,i) => Console.println("\t => v(" + i + ") = " + v.value)
-		}
+		}*/
 		stats
 	}
 	
@@ -286,7 +286,7 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
 							box => 
 								val outRect = new Rect(
 										new Point(box("xMin").value, box("yMin").value),
-										new Size(dCVs("xSz").value, dCVs("ySz").value)) 
+										new Point(box("xMin").value + dCVs("xSz").value - 1, box("yMin").value + dCVs("ySz").value - 1)) 
 								Console.println("\t" + outRect)
 								outRect
 						})})}
