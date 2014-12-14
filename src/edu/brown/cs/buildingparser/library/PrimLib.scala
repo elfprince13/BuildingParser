@@ -19,7 +19,7 @@ trait Primitive {
 	def name():String
 }
 
-trait PrimLib {
-	def loadFromDirs(srcs:List[File]):(List[Primitive],Map[String, List[Primitive]])
-	def computeSIFTs(prims:List[Primitive]):Map[Primitive,(MatOfKeyPoint,Mat)]
+trait PrimLib[T <: Primitive] {
+	def loadFromDirs(specialKinds:Set[String], srcs:List[File]):(List[T],Map[String, List[T]])
+	def computeSIFTs(prims:List[T]):Map[T,(MatOfKeyPoint,Mat)]
 }

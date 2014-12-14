@@ -192,14 +192,14 @@ object SamplerMain {
 	
 	def parisSampler() = {
 		makeStandardSampler(
-				"/Users/thomas/Documents/Brown/CS2951B-DataDrivenVisionandGraphics/cvpr2010/images",
-				"/Users/thomas/Documents/Brown/CS2951B-DataDrivenVisionandGraphics/ground_truth_2011.zip Folder")
+				"/Users/thomas/Documents/cvpr2010/images",
+				"/Users/thomas/Documents/ground_truth_2011.zip Folder")
 	}
 	
 	def grazSampler() = {
 		makeStandardSampler(
-				"/Users/thomas/Documents/Brown/CS2951B-DataDrivenVisionandGraphics/graz50_facade_dataset.zip Folder/graz50_facade_dataset/images",
-				"/Users/thomas/Documents/Brown/CS2951B-DataDrivenVisionandGraphics/graz50_facade_dataset.zip Folder/graz50_facade_dataset/labels_full")
+				"/Users/thomas/Documents/graz50_facade_dataset.zip Folder/graz50_facade_dataset/images",
+				"/Users/thomas/Documents/graz50_facade_dataset.zip Folder/graz50_facade_dataset/labels_full")
 	}
 	
 	def main(args:Array[String]):Unit = {
