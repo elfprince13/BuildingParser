@@ -21,7 +21,7 @@ class Translate(ofs:Point) extends Transform {
 		}
 }
 
-class Prim2DRects(val data:Mat, val masks:Mat, nameFormatter:(Size => String)) extends Primitive {
+class Prim2DRect(val data:Mat, val masks:Mat, nameFormatter:(Size => String)) extends Primitive {
 	def numDims():Int = 2
 	def varsStart():Int = 2
 	def numColorVars():Int = 2
@@ -48,7 +48,7 @@ class Prim2DRects(val data:Mat, val masks:Mat, nameFormatter:(Size => String)) e
 		}
 	}
 	
-	def reward(dst:Mat, colorVars:List[Scalar], txform:Option[Transform]):Double = {
+	def reward(dst:Mat, colorVars:List[Scalar], txform:Option[Transform], params:Map[String,Double] = Map("l" -> 0.25, "k" -> 1)):Double = {
 		val origin = new Point(0,0)
 		val ofs = txform match {
 			case Some(t) => t.transform(origin)
@@ -68,15 +68,24 @@ class Prim2DRects(val data:Mat, val masks:Mat, nameFormatter:(Size => String)) e
 		Core.absdiff(chunkSmooth, primRepr, diff)
 		
 		
-		0
+		(0 until diff.height).map{ 
+			r => 
+				(0 until diff.width).map{
+					c =>
+						val cDiffs = diff.get(r, c)
+						val dLen = Math.sqrt(cDiffs.foldLeft(0.0)((b,a) => b + a*a))
+						val okp = 1.0 + params("k")*dLen
+						1.0 / (okp * okp)
+				}
+		}.flatten.foldLeft(0.0)(_+_) / Math.pow(diff.size.area, 1 - params("l"))
 	}
 	
 	def bounds():Size = data.size
 	def name():String = nameFormatter(bounds)
 }
 
-object Prim2DRectsLib extends PrimLib[Prim2DRects] {
-	def loadFromDirs(specialKinds:Set[String], srcs:List[File]) : (List[Prim2DRects],Map[String, List[Prim2DRects]]) = {
+object Prim2DRectsLib extends PrimLib[Prim2DRect] {
+	def loadFromDirs(specialKinds:Set[String], srcs:List[File]) : (List[Prim2DRect],Map[String, List[Prim2DRect]]) = {
 		val primImgs = srcs.map{
 			f => 
 				val fAbs = f.getAbsoluteFile
@@ -89,22 +98,22 @@ object Prim2DRectsLib extends PrimLib[Prim2DRects] {
 		  
 		val allPrims = primImgs.map{
 			case(kind, varsMask, img) =>
-				(kind, new Prim2DRects(img, varsMask, ((sz:Size) => f"$kind - ${sz.width.intValue}%d x ${sz.height.intValue}%d")))
+				(kind, new Prim2DRect(img, varsMask, ((sz:Size) => f"$kind - ${sz.width.intValue}%d x ${sz.height.intValue}%d")))
 		}
-		allPrims.foldLeft((List[Prim2DRects](),Map[String, List[Prim2DRects]]())){
+		allPrims.foldLeft((List[Prim2DRect](),Map[String, List[Prim2DRect]]())){
 			case(lastOut, in) =>
 				val (std, special) = lastOut
 				val (kind, prim) = in
 				if (specialKinds.contains(kind)) {
 					(std :+ prim, special)
 				} else {
-					val kindUpd = (special.getOrElse(kind, List[Prim2DRects]()) :+ prim)
+					val kindUpd = (special.getOrElse(kind, List[Prim2DRect]()) :+ prim)
 					(std, special + (kind -> kindUpd))
 				}
 		}
 	}
 	
-	def computeSIFTs(prims:List[Prim2DRects]):Map[Prim2DRects,(MatOfKeyPoint,Mat)] = {
+	def computeSIFTs(prims:List[Prim2DRect]):Map[Prim2DRect,(MatOfKeyPoint,Mat)] = {
 		val siftDetector = FeatureDetector.create(FeatureDetector.SIFT)
 		val siftExtractor = DescriptorExtractor.create(DescriptorExtractor.SIFT)
 		prims.map{

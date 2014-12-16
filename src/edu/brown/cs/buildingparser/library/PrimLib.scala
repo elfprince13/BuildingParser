@@ -15,7 +15,7 @@ trait Primitive {
 	def numDims():Int
 	def numColorVars():Int
 	def project(dst:Mat, colorVars:List[Scalar], txform:Option[Transform]):Unit
-	def reward(against:Mat, colorVars:List[Scalar], txform:Option[Transform]):Double
+	def reward(against:Mat, colorVars:List[Scalar], txform:Option[Transform], params:Map[String,Double]):Double
 	def bounds():Size
 	def name():String
 }
