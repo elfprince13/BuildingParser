@@ -14,7 +14,8 @@ class DPEvaluator(gridStep:(Int, Int), k:Double = 1, l:Double = 0.25) {
 	
 	val noSolutionC:(Double,Option[(List[Scalar],Prim2DRect)]) = (Double.NegativeInfinity, None)
 	val noSolutionR:(Double,Int) = (Double.NegativeInfinity, 0)
-	val notInitialized:(Double,Option[(List[Scalar],Prim2DRect)]) = (Double.NaN, None)
+	val notInitializedC:(Double,Option[(List[Scalar],Prim2DRect)]) = (Double.NaN, None)
+	val notInitializedR:(Double,Int) = (Double.NaN, 0)
 	
 	class DPHelper(img:Mat, lib:List[Prim2DRect], colorTable:Set[Scalar], colsTable:Array[Array[Array[(Double,Option[(List[Scalar],Prim2DRect)])]]], rowsTable:Array[(Double,Int)]) {
 		def optimizeColumns(r:Int, h:Int, w:Int):(Double,Option[(List[Scalar],Prim2DRect)]) = {
@@ -28,11 +29,11 @@ class DPEvaluator(gridStep:(Int, Int), k:Double = 1, l:Double = 0.25) {
 						color =>
 							colorTable.view.map{
 								complColor =>	
-									lib.view.filter(brick => brick.data.width <= w && brick.data.height == h).map{
+									lib.view.filter(brick => brick.data.width / gridStep._1 <= w && brick.data.height / gridStep._2 == h).map{
 										brick => 
 											val colorVars = List(color, complColor)
-											val nextW = w - brick.data.width
-											val brickReward = brick.reward(img, colorVars, Some(new Translate(new Point(nextW, r))), params)
+											val nextW = w - (brick.data.width / gridStep._1)
+											val brickReward = brick.reward(img, colorVars, Some(new Translate(new Point(nextW * gridStep._1, r * gridStep._2))), params)
 											val restReward = optimizeColumns(r, h, nextW)
 											(brickReward + restReward._1, Some(colorVars, brick))
 									}
@@ -55,9 +56,9 @@ class DPEvaluator(gridStep:(Int, Int), k:Double = 1, l:Double = 0.25) {
 				rowsTable(h) = if(h == 0){
 					(0, 0)
 				} else {
-					lib.view.map(brick => brick.data.height).filter(_ <= h).toSet[Int].map{
+					lib.view.map(brick => brick.data.height / gridStep._2).filter(_ <= h).toSet[Int].map{
 						brickH =>
-							val rowReward = optimizeColumns(h - brickH, brickH, img.width)
+							val rowReward = optimizeColumns(h - brickH, brickH, img.width / gridStep._1)
 							val restReward = optimizeRows(h - brickH)
 							// We want to iterate over this whole row!
 							(rowReward._1 + restReward._1, brickH)
@@ -78,14 +79,26 @@ class DPEvaluator(gridStep:(Int, Int), k:Double = 1, l:Double = 0.25) {
 			val (bestReward, right) = optimizeColumns(r, h, c)
 			right match{
 				case Some(primSpec) => 
-				case None => throw new IllegalStateException("Was unable to generate a valid tiling with these inputs")
+					val nextC = c - (primSpec._2.data.width / gridStep._1)
+					(new Translate(new Point(nextC * gridStep._1, r * gridStep._2)), primSpec._1, primSpec._2) #:: unpackRow(r, h, nextC)
+				case None => 
+					if(c == 0){
+						Stream[(Transform,List[Scalar],Prim2DRect)]()
+					} else {
+						throw new IllegalStateException("Was unable to generate a valid tiling with these inputs")
+					}
 			}
 		}
 		
-		def unpackTable(r:Int):Stream[(Transform,List[Scalar],Prim2DRect)] = {
-			val (bestReward, bottomH) = optimizeRows(r)
-			if(bottomH == 0){
-				
+		def unpackTable(bottomR:Int):Stream[(Transform,List[Scalar],Prim2DRect)] = {
+			val (bestReward, h) = optimizeRows(bottomR)
+			val r = bottomR - h
+			if(r == 0 && h == 0){
+				Stream[(Transform,List[Scalar],Prim2DRect)]()
+			} else if(h != 0){
+				unpackRow(r, h, img.width / gridStep._1) #::: unpackTable(r)
+			} else {
+				throw new IllegalStateException("Was unable to generation a valid tiling with these inputs (got h == 0 && r != 0")
 			}
 		}
 	}
@@ -98,15 +111,11 @@ class DPEvaluator(gridStep:(Int, Int), k:Double = 1, l:Double = 0.25) {
 		}
 		val steppedRowCount = img.height / gridStep._2
 		val steppedColCount = img.width / gridStep._1
-		val colsTable = Array.fill[(Double,Option[(List[Scalar],Prim2DRect)])](steppedRowCount + 1, steppedRowCount + 1, steppedColCount + 1)(notInitialized)
-		val rowsTable = Array.fill[(Double,Option[(List[Scalar],Prim2DRect)])](steppedColCount + 1, steppedRowCount + 1)(notInitialized)
+		val colsTable = Array.fill[(Double,Option[(List[Scalar],Prim2DRect)])](steppedRowCount + 1, steppedRowCount + 1, steppedColCount + 1)(notInitializedC)
+		val rowsTable = Array.fill[(Double,Int)](steppedRowCount + 1)(notInitializedR)
 	
 		val helper = new DPHelper(img:Mat, lib:List[Prim2DRect], colorTable:Set[Scalar], colsTable, rowsTable)
-		
-		// This invocation is definitely wrong, because we're mixing coordinate spaces
-		//val (bestScore, bottomRight) = helper.optimizeRows(img.width, img.height)
-		helper.unpackTable(img.height)
-		
+		helper.unpackTable(img.height / gridStep._2)
 	}
 	
 }
