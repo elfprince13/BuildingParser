@@ -40,8 +40,10 @@ class ExtractSamples(imgDir:String, labelDir:String, destDir:String, antiDestDir
 			INV_OVERLAP_THRESHOLD < box.area()) ){
 			counterRect
 		} else {
-			if(depth >= MAX_RANDOM_DEPTH){ null }
-			else{ findCounterExample(srcImg, exclBoxes, bound, depth+1) }
+			if(depth >= MAX_RANDOM_DEPTH){
+				//Console.println("Counter example search-depth exceeded")
+				null 
+			} else{ findCounterExample(srcImg, exclBoxes, bound, depth+1) }
 		}
 	}
 	
@@ -115,7 +117,7 @@ class ExtractSamples(imgDir:String, labelDir:String, destDir:String, antiDestDir
 					val boxes = extractLabeledRects(labelImg, labelColor, BOUNDARY_WIDTH)
 					val grabbedPos = grabBucketed(srcImg, boxes)
 					val grabbedNeg = bounds.view.map{ bound => 
-						grabBucketed(srcImg,Seq.fill(COUNTER_EXAMPLES_PER_BINSIZE)(findCounterExample(srcImg, boxes, bound)).toList)
+						grabBucketed(srcImg,Seq.fill(COUNTER_EXAMPLES_PER_BINSIZE)(findCounterExample(srcImg, boxes, bound)).filter(rect => rect != null).toList)
 					}.flatten
 					(labelName, labelColor, grabbedPos, grabbedNeg)
 				} else {
@@ -206,9 +208,10 @@ object SamplerMain {
 		if(isMain){
 			System.loadLibrary(Core.NATIVE_LIBRARY_NAME)
 		}
-		
-		parisSampler.extractAndSaveAll
-		grazSampler.extractAndSaveAll
+		val pSampler = parisSampler
+		pSampler.extractAndSaveAll
+		val gSampler = grazSampler
+		gSampler.extractAndSaveAll
 	}
 }
 
