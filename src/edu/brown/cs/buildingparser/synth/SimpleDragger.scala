@@ -13,18 +13,24 @@ import jsat.linear.DenseVector
 import jsat.linear.VecPaired
 import jsat.linear.distancemetrics.EuclideanDistance
 
+import edu.brown.cs.buildingparser.Util
+
 import scala.collection.JavaConverters._
 
-class SimpleDragger extends DragObj{
-	def pt2Vec(pt:Point):DenseVector = {
+class SimpleDragger(srcSz:Size, dstSz:Size, objs:List[(Rect,Rect)]) extends DragObj(srcSz, dstSz, objs){
+	private def pt2Vec(pt:Point):DenseVector = {
 		new DenseVector(List(pt.x, pt.y).map(_.asInstanceOf[java.lang.Double]).asJava)
 	}
-	def vec2Pt(vec:DenseVector):Point = {
+	private def vec2Pt(vec:DenseVector):Point = {
 		new Point(vec.get(0), vec.get(1))
 	}
-	def dragObjs(src:Mat, dst:Mat, objs:List[(Rect,Rect)]):Unit = {
-		val srcBound = new Rect(new Point(0,0), src.size)
-		val dstBound = new Rect(new Point(0,0), dst.size)
+	
+	private def makeMaps():(Mat,Mat) = {
+		Console.println("Initializing SimpleDragger")
+		val srcBound = new Rect(new Point(0,0), srcSz)
+		val dstBound = new Rect(new Point(0,0), dstSz)
+		val xScale = dstSz.width / srcSz.width
+		val yScale = dstSz.height / srcSz.height
 		val keypointMap = (objs :+ (dstBound, srcBound)).map{
 			case(oldR, newR) =>
 				List(
@@ -38,11 +44,14 @@ class SimpleDragger extends DragObj{
 		
 		val knn = new KDTree[DenseVector](keypointSrcs, new EuclideanDistance())
 		
-		val mapX = new Mat(dst.size, CvType.CV_32FC1)
-		val mapY = new Mat(dst.size, CvType.CV_32FC1)
+		val mapX = new Mat(dstSz, CvType.CV_32FC1)
+		val mapY = new Mat(dstSz, CvType.CV_32FC1)
 		
-		(0 until dst.rows).foreach{
-			r => (0 until dst.cols).foreach{
+		Console.println("Setting up map")
+		(0 until mapX.rows).foreach{
+			r => 
+				//Console.println(f"Setting up row $r")
+				(0 until mapX.cols).foreach{
 				c => 
 					val here = new Point(c, r)
 					val hereVec = pt2Vec(here)
@@ -68,19 +77,32 @@ class SimpleDragger extends DragObj{
 							val kpP = vec2Pt(kpPair.getVector)
 							val kpD = kpPair.getPair
 							val kpDst = keypointMap(kpP)
-							(dx + Math.abs((kpDst.x - kpP.x) / (1 + Math.abs(kpD))), dy + Math.abs((kpDst.y - kpP.y) / (1 + Math.abs(kpD))))
+							
+							val xDisp = (((kpDst.x * xScale) - kpP.x)) / (1 + Math.abs(kpD))
+							val yDisp = (((kpDst.y * yScale) - kpP.y)) / (1 + Math.abs(kpD))
+							(dx + xDisp, dy + yDisp)
 					}
 					val ourNorm = ourKPs.foldLeft(0.0){
 						case(a, kpPair) => a + (1 / (1 + Math.abs(kpPair.getPair)))
 					}
-					mapX.put(r, c, Array.fill(1)(here.x.floatValue + (ourDelta._1 / ourNorm).floatValue))
-					mapY.put(r, c, Array.fill(1)(here.y.floatValue + (ourDelta._1 / ourNorm).floatValue))
+					mapX.put(r, c, Array.fill(1)( 
+							((here.x + (ourDelta._1 / ourNorm)) / xScale).floatValue))
+					mapY.put(r, c, Array.fill(1)(
+							((here.y + (ourDelta._2 / ourNorm)) / yScale).floatValue))
 					
 			}
 		}
+		Util.makeImageFrame(Util.matToImage(mapX, (255.0 / srcSz.width).floatValue),"x Displacement")
+		Util.makeImageFrame(Util.matToImage(mapY, (255.0 / srcSz.height).floatValue),"y Displacement")
 		val fastMapPairs = new Mat
 		val fastMapInterp = new Mat
 		Imgproc.convertMaps(mapX, mapY, fastMapPairs, fastMapInterp, CvType.CV_16SC2)
+		(fastMapPairs, fastMapInterp)
+	}
+	
+	val (fastMapPairs, fastMapInterp) = makeMaps()
+	
+	def dragObjs(src:Mat,dst:Mat):Unit = {
 		Imgproc.remap(src, dst, fastMapPairs, fastMapInterp, Imgproc.INTER_LINEAR, Imgproc.BORDER_REPLICATE, new Scalar(0))
 	}
 }

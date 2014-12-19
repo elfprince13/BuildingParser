@@ -25,9 +25,11 @@ import org.opencv.imgproc.Imgproc
 import org.opencv.core.Rect
 import org.opencv.core.Point
 import edu.brown.cs.buildingparser.synth.LDrawGridify
+import edu.brown.cs.buildingparser.library.BrickSynth
 import edu.brown.cs.buildingparser.synth.SimpleDragger
 import edu.brown.cs.buildingparser.synth.ObjConstraints
 import edu.brown.cs.buildingparser.synth.DPSubdivider
+import edu.brown.cs.buildingparser.synth.DPEvaluator
 
 object Main {
 	def jDL(l:List[Double]):java.util.List[java.lang.Double] = {
@@ -174,15 +176,62 @@ object Main {
 			
 			
 			val imgRemapped = Mat.zeros(griddedBoxesImg.size, griddedBoxesImg.`type`)
+			val boxTargets = clusteredContents.map{
+				case(clusterName, srcCluster) =>
+					val dstCluster = griddedClusteredContents(clusterName)
+					srcCluster.map{
+						case(clustNum, srcRects) =>
+							val dstRects = dstCluster(clustNum)
+							dstRects.zip(srcRects._2.map{
+								rect =>
+									new Rect(ofsPoint(rect.tl, borderOfs), rect.size)
+							})
+					}.flatten
+					
+			}.flatten.toList
+			val dragger = new SimpleDragger(imgClip.size, imgRemapped.size, boxTargets)
+			dragger.dragObjs(imgClip, imgRemapped)
+			Util.makeImageFrame(Util.matToImage(imgRemapped),"Remapping result")
+			val dpTarget = new Mat(imgRemapped.size, imgRemapped.`type`)
 			
+			val brickLib = BrickSynth.getStdBricks()
+			val brickPlacer = new DPEvaluator(LDrawGridify.gridStep, l = 0.9)
 			val stripper = new DPSubdivider(LDrawGridify.gridStep)
-			val regions = stripper.getNonObjRegions(new Rect(new Point(0,0),solver.getSolvedBoundary), stripper.sortObjs(griddedClusteredContents.values.flatMap(_.values.flatten).toList))//, Some(griddedBoxesImg))
-			regions.foreach{
-				region => 
+			val boundaryRect = new Rect(new Point(0,0),solver.getSolvedBoundary)
+			val regions = stripper.getNonObjRegions(boundaryRect, stripper.sortObjs(griddedClusteredContents.values.flatMap(_.values.flatten).toList))//, Some(griddedBoxesImg))
+			Console.println(f"output images have dims ${griddedBoxesImg.width} x ${griddedBoxesImg.height} and ${dpTarget.width} x ${dpTarget.height}")
+			regions.zipWithIndex.foreach{
+				case(region, i) => 
+					Console.println(f"Drawing region $i / ${regions.length}")
 					val rn = rg.nextInt(256)
 					val color = new Scalar(128 + rg.nextInt(128), 128 + rg.nextInt(128), rn)
-					Core.rectangle(griddedBoxesImg, region.tl, ofsPoint(region.br, new Point(-1, -1)), color, -1)
+					Util.checkContains(boundaryRect, region) match {
+						case None => Console.println("Skipping bad rectangle")
+						case Some(region) =>
+							Core.rectangle(griddedBoxesImg, region.tl, ofsPoint(region.br, new Point(-1, -1)), color, -1)
+	
+							//*
+							// The math.min stuff is an ugly hack around the CP implementation lying to us
+							val gridImg = imgRemapped.submat(region.tl.y.intValue, Math.min(imgRemapped.rows,region.br.y.intValue).intValue, region.tl.x.intValue, Math.min(imgRemapped.cols,region.br.x.intValue).intValue)
+							val dstImg = dpTarget.submat(region.tl.y.intValue, Math.min(dpTarget.rows,region.br.y.intValue).intValue, region.tl.x.intValue,  Math.min(dpTarget.cols,region.br.x.intValue).intValue)
+							val instr = brickPlacer.evaluate(gridImg, brickLib, BrickSynth.COLOR_TABLE.toSet[(Scalar,Scalar)])
+	
+							instr.foreach{
+							case(proj,colors,brick) =>
+							brick.project(dstImg, colors, Some(proj))
+							}
+							//Console.println(f"Has area: ${region.area} and dims")
+							//if(region.area != 0){
+							Util.makeImageFrame(Util.matToImage(gridImg), f"src $i")
+							Util.makeImageFrame(Util.matToImage(dstImg), f"solved $i")
+							//}
+							Util.makeImageFrame(Util.matToImage(dpTarget), f"solved $i (whole)")
+							//*/
+
+					}
+					
 			}
+			//Util.makeImageFrame(Util.matToImage(dpTarget), "solved")
 			Util.makeImageFrame(Util.matToImage(boxesImg), "boxes")
 			Util.makeImageFrame(Util.matToImage(griddedBoxesImg), "gridded boxes")
 			

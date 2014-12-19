@@ -27,19 +27,19 @@ class DPEvaluator(gridStep:(Int, Int), k:Double = 1, l:Double = 0.25) {
 	class DPHelper(img:Mat, lib:List[Prim2DRect], colorTable:Set[(Scalar,Scalar)], colsTable:Array[Array[Array[(Double,Option[(List[Scalar],Prim2DRect)])]]], rowsTable:Array[(Double,Int)]) {
 		val heightSetsLE = new Array[Set[Int]](rowsTable.length) 
 		val brickSetsE = new Array[Array[List[Prim2DRect]]](rowsTable.length)
-		Console.println("Initializing height sets")
+		//Console.println("Initializing height sets")
 		(0 until heightSetsLE.length).foreach{
 			h => 
-				Console.println(f"height $h")
+				//Console.println(f"height $h")
 				heightSetsLE(h) = lib.view.map(brick => brick.data.height / gridStep._2).filter(_ <= h).toSet[Int]
 				brickSetsE(h) = new Array[List[Prim2DRect]](colsTable(h)(h).length)
 				(0 until brickSetsE(h).length).foreach{
 					w =>
-						Console.println(f"  width $w")
+						//Console.println(f"  width $w")
 						brickSetsE(h)(w) = lib.view.filter(brick => brick.data.width / gridStep._1 <= w && brick.data.height / gridStep._2 == h).toList
 				}
 		}
-		Console.println("Done Initializing")
+		//Console.println("Done Initializing")
 		
 		def optimizeColumns(r:Int, h:Int, w:Int):(Double,Option[(List[Scalar],Prim2DRect)]) = {
 			if(h == 0){
@@ -163,7 +163,7 @@ object DPTest {
 		val srcHandle = grazSampler.imgHandleFromName("facade_1_0056092_0056345.png")//("facade_0_0099003_0099285.png")//
 		//val labelHandle = grazSampler.pairedImgs(srcHandle)
 		//val (srcBase, examples) = grazSampler.extractOneExampleSet(srcHandle, labelHandle)
-		val srcImg = Highgui.imread(srcHandle.getAbsolutePath, Highgui.CV_LOAD_IMAGE_COLOR)
+		val srcImg = Highgui.imread(srcHandle.getAbsolutePath, Highgui.CV_LOAD_IMAGE_COLOR).submat(0,96,0,200)
 		val gridRows = LDrawGridify.nearestMeshPoint(srcImg.rows, LDrawGridify.gridStep._2)
 		val gridCols = LDrawGridify.nearestMeshPoint(srcImg.cols, LDrawGridify.gridStep._1)
 		
@@ -171,7 +171,7 @@ object DPTest {
 		Imgproc.resize(srcImg, gridImg, gridImg.size)
 		Console.println(f"Resizing ${srcImg.cols} x ${srcImg.rows} to $gridCols x $gridRows for ${LDrawGridify.gridStep}")
 		
-		val brickPlacer = new DPEvaluator(LDrawGridify.gridStep)
+		val brickPlacer = new DPEvaluator(LDrawGridify.gridStep, l = 0.9, k = 1)
 		val instr = brickPlacer.evaluate(gridImg, BrickSynth.getStdBricks(), BrickSynth.COLOR_TABLE.toSet[(Scalar,Scalar)])
 		
 		val dstImg = Mat.zeros(gridImg.size, gridImg.`type`)

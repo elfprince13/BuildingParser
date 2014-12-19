@@ -225,7 +225,7 @@ object Util {
 		outMat
 	}
 	
-	def matToImage(inMat:Mat):BufferedImage = {
+	def matToImage(inMat:Mat, fNorm:Float = 255):BufferedImage = {
 		val kind = inMat.channels match {
 			case 1 => BufferedImage.TYPE_BYTE_GRAY
 			case 3 => BufferedImage.TYPE_3BYTE_BGR
@@ -233,11 +233,18 @@ object Util {
 			BufferedImage.TYPE_4BYTE_ABGR
 			case _ => throw new java.awt.AWTException("Don't know what to do with this channel layout")
 		}
-		
-		val bufferSize = inMat.channels * inMat.cols * inMat.rows 
-		val b = new Array[Byte](bufferSize)
-		inMat.get(0,0,b)
 		val image = new BufferedImage(inMat.cols,inMat.rows,kind)
+		val bufferSize = inMat.channels * inMat.cols * inMat.rows
+			
+		val b = if(inMat.`type` == 5){
+			val f = new Array[Float](bufferSize)
+			inMat.get(0,0,f)
+			f.map{ fv => (fv * fNorm).byteValue}
+		} else {
+			val b = new Array[Byte](bufferSize)
+			inMat.get(0,0,b)
+			b
+		}
 		System.arraycopy(b, 0, image.getRaster.getDataBuffer.asInstanceOf[DataBufferByte].getData, 0, b.length)
 		image
 	}
