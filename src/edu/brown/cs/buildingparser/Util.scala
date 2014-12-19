@@ -18,6 +18,9 @@ import org.opencv.core.CvType
 import org.opencv.core.Scalar
 import java.io.File
 import org.opencv.core.Rect
+import jsat.distributions.multivariate.MetricKDE
+import jsat.linear.distancemetrics.EuclideanDistance
+import jsat.distributions.empirical.kernelfunc.GaussKF
 import jsat.clustering.MeanShift
 import jsat.SimpleDataSet
 import jsat.classifiers.DataPoint
@@ -82,23 +85,35 @@ object Util {
 		}
 	}
 	
-	def clusterRects(bbs:List[Rect]):Array[Int] = {
+	def clusterRects(bbs:List[Rect]):List[List[Rect]] = {
 		Console.println("Clustering rects")
-		val clusterer = new MeanShift
 		val data = new SimpleDataSet(bbs.map{rect => 
 			val tl = rect.tl
 			val br = rect.br
 			val rectV = new DenseVector(List(tl.x, tl.y, br.x, br.y).map(_.asInstanceOf[java.lang.Double]).asJava)
 			val dp = new DataPoint(rectV, new Array[Int](0), new Array[CategoricalData](0))
 			dp}.asJava)
-		val clusterAssignments = clusterer.cluster(data, null)
-		/*
+		
+		val mkde = new MetricKDE(GaussKF.getInstance(), new EuclideanDistance)
+		val bandwidth = Util.calcBandwidth(data, 0.0125)
+		mkde.setBandwith(bandwidth)
+		mkde.setDefaultK(1)
+		Console.println("Bandwidth: " + mkde.getBandwith())
+		val clusterer = new MeanShift(mkde)
+		val clusterAssignments = clusterer.cluster(data).asScala.map{
+			_.asScala.map{
+				dp => 
+					val vec = dp.getNumericalValues
+					new Rect(new Point(vec.get(0), vec.get(1)), new Point(vec.get(2),vec.get(3)))
+			}.toList
+		}.toList
 		clusterAssignments.foreach{
-			i => Console.print(i + " ")
+			cluster => Console.println(cluster)
 		}
 		Console.println("")
-		*/
+		
 		clusterAssignments
+		
 	}
 	
 	

@@ -6,6 +6,7 @@ import java.io.File
 import edu.brown.cs.buildingparser.Util
 import org.opencv.core.Mat
 import org.opencv.core.CvType
+import org.opencv.core.Core
 import org.opencv.highgui.Highgui
 import org.opencv.core.MatOfFloat
 import scala.actors.Actor
@@ -15,6 +16,7 @@ import scala.pickling._
 import binary._
 import scala.io.Source
 import org.apache.commons.io.IOUtils
+
 
 class LearnObjectType(className:String, objDir:String, objAntiDir:String, counterClasses:List[String],
 		exts:Set[String], hogs:List[HOGDescriptor]) {
@@ -150,6 +152,25 @@ object LearnerFactory {
 	def learnAll(usedHogs:List[HOGDescriptor]):Unit = {
 		learnDoors(usedHogs)
 		learnWindows(usedHogs)
-		learnBalconies(usedHogs)
+		//learnBalconies(usedHogs)
+	}
+}
+
+object LearnerTest {
+	var isMain = true
+	def main(args:Array[String]):Unit = {
+		if(isMain){
+			System.loadLibrary(Core.NATIVE_LIBRARY_NAME)
+		}
+		SamplerMain.isMain = false
+		val dimBuckets = SamplerMain.dimBuckets
+		val boundBuckets = SamplerMain.boundBuckets
+		val defaultHog = new HOGDescriptor
+		val usedHogs = boundBuckets.map(windowSize => 
+			new HOGDescriptor(windowSize, defaultHog.get_blockSize, defaultHog.get_blockStride, 
+					defaultHog.get_cellSize, defaultHog.get_nbins))
+					
+		LearnerFactory.learnAll(usedHogs)
+		
 	}
 }

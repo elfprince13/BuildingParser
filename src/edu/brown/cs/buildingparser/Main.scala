@@ -71,17 +71,21 @@ object Main {
 		val dimBuckets = SamplerMain.dimBuckets
 		val boundBuckets = SamplerMain.boundBuckets
 		
+		val rg = new Random
+		
+		/*
 		val clusterCenters = List(
 				new DenseVector(jDL(List(1,0,0))), new DenseVector(jDL(List(0,0,0))), 
 				new DenseVector(jDL(List(1,0,1))), new DenseVector(jDL(List(0,0,1))), 
 				new DenseVector(jDL(List(1,1,0))), new DenseVector(jDL(List(0,1,0))), 
 				new DenseVector(jDL(List(1,1,1))), new DenseVector(jDL(List(0,1,1))))
 				
-		val rg = new Random
 		val dvs = clusterCenters.view.map(dv => Seq.fill(5)(dv.add(new DenseVector(jDL(Seq.fill(3)(rg.nextDouble / 20).toList))))).flatten.toList
 		val data = new SimpleDataSet(dvs.map(dv => new DataPoint(dv, new Array[Int](0), new Array[CategoricalData](0))).asJava)
 		val clusterer = new MeanShift
-		//Util.dumpClusters(clusterer.cluster(data).asScala.map(_.asScala.toList).toList)
+		
+		 //Util.dumpClusters(clusterer.cluster(data).asScala.map(_.asScala.toList).toList)
+		 */
 		
 		
 		
@@ -253,21 +257,33 @@ object Main {
 		}
 		
 		
-		/*
-		val image = Highgui.imread(args(0), Highgui.CV_LOAD_IMAGE_GRAYSCALE)
+		//*
+		val imageTest = Highgui.imread(srcHandle.getAbsolutePath, Highgui.CV_LOAD_IMAGE_GRAYSCALE)
 		Console.println("Testing: " + image.size)
-		val wd = new SVMDetector("trained-svms/1415255461043_window_.opencv_svm",usedHogs,"trained-svms/window-posExSizes.histogram")
-		val detected = wd.detect(image).map{case(rect, response) => rect}.toList
+		val wd = new SVMDetector("trained-svms/1418999570258_window_.opencv_svm",usedHogs,"trained-svms/window-posExSizes.histogram")
+		val detected = wd.detect(imageTest).map{case(rect, response) => 
+			Console.println("Found " + rect + " with response " + response)
+			rect}.toList
 		val assignedClusters = Util.clusterRects(detected)
-		*/
+		val clusterReps = assignedClusters.map{
+				cluster =>
+				val avgR = cluster.foldLeft((0,0.0,0.0,0.0,0.0)){
+					case((n,tX,tY, bX, bY), rect) =>
+						val nextN = n + 1
+						(nextN, (tX * n) / nextN + (rect.tl.x) / nextN, (tY * n) / nextN + (rect.tl.y) / nextN, (bX * n) / nextN + (rect.br.x) / nextN, (bY * n) / nextN + (rect.br.y) / nextN)
+				}
+				new Rect(new Point(avgR._2, avgR._3), new Point(avgR._4, avgR._5))
+			}
+		//Console.println()
+		//*/
 		
-		/*
-		foreach{
-			case(found, response) =>
-				Core.rectangle(image, found.tl, found.br, new Scalar(1.0))
+		//*
+		clusterReps.foreach{
+			case(found) =>
+				Core.rectangle(imageTest, found.tl, found.br, new Scalar(1.0))
 		}
-		
-		*/
+		Util.makeImageFrame(Util.matToImage(imageTest),"window detections")
+		//*/
 		
 		
 

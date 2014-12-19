@@ -15,7 +15,7 @@ import org.apache.commons.io.IOUtils
 import scala.pickling._
 import binary._
 
-class SVMDetector(svmName:String, hogsUsed:List[HOGDescriptor], histogramName:String = "", histogramThreshold:Int = 1) {
+class SVMDetector(svmName:String, hogsUsed:List[HOGDescriptor], histogramName:String = "", histogramThreshold:Int = 10) {
 	val histogram = if(histogramName != ""){
 		Console.println("Restricting hogsUsed by example-histogram with threshold: " + histogramThreshold)
 		val in = new java.io.FileInputStream(histogramName)		
