@@ -162,6 +162,8 @@ object Main {
 							(new Rect(ofsPoint(grabBox.tl, borderOfs), grabBox.size), obj)
 					})
 			})
+			Util.makeImageFrame(Util.matToImage(boxesImg), "boxes")
+			
 			
 			val griddedBoxesImg = Mat.zeros(solver.getSolvedBoundary, boxesImg.`type`)
 			val griddedClusteredContents = solver.getSolvedObjs
@@ -173,6 +175,7 @@ object Main {
 			}
 			
 			showObjectBorders(griddedBoxesImg, griddedContents)
+			Util.makeImageFrame(Util.matToImage(griddedBoxesImg), "gridded objects")
 			
 			
 			val imgRemapped = Mat.zeros(griddedBoxesImg.size, griddedBoxesImg.`type`)
@@ -189,6 +192,25 @@ object Main {
 					}.flatten
 					
 			}.flatten.toList
+			
+			val stripper = new DPSubdivider(LDrawGridify.gridStep)
+			val boundaryRect = new Rect(new Point(0,0),solver.getSolvedBoundary)
+			val regions = stripper.getNonObjRegions(boundaryRect, stripper.sortObjs(griddedClusteredContents.values.flatMap(_.values.flatten).toList))//, Some(griddedBoxesImg))
+			Console.println(f"output image for boxes has dims ${griddedBoxesImg.width} x ${griddedBoxesImg.height}")
+			regions.zipWithIndex.foreach{
+				case(region, i) => 
+					Console.println(f"Drawing region $i / ${regions.length}")
+					val rn = rg.nextInt(256)
+					val color = new Scalar(128 + rg.nextInt(128), 128 + rg.nextInt(128), rn)	
+					Util.checkContains(boundaryRect, region) match {
+						case None => Console.println("Skipping bad rectangle")
+						case Some(region) =>
+							Core.rectangle(griddedBoxesImg, region.tl, ofsPoint(region.br, new Point(-1, -1)), color, -1)
+					}
+			}
+			Util.makeImageFrame(Util.matToImage(griddedBoxesImg), "gridded boxes")
+			
+			
 			val dragger = new SimpleDragger(imgClip.size, imgRemapped.size, boxTargets)
 			dragger.dragObjs(imgClip, imgRemapped)
 			Util.makeImageFrame(Util.matToImage(imgRemapped),"Remapping result")
@@ -196,44 +218,33 @@ object Main {
 			
 			val brickLib = BrickSynth.getStdBricks()
 			val brickPlacer = new DPEvaluator(LDrawGridify.gridStep, l = 0.9)
-			val stripper = new DPSubdivider(LDrawGridify.gridStep)
-			val boundaryRect = new Rect(new Point(0,0),solver.getSolvedBoundary)
-			val regions = stripper.getNonObjRegions(boundaryRect, stripper.sortObjs(griddedClusteredContents.values.flatMap(_.values.flatten).toList))//, Some(griddedBoxesImg))
-			Console.println(f"output images have dims ${griddedBoxesImg.width} x ${griddedBoxesImg.height} and ${dpTarget.width} x ${dpTarget.height}")
+			Console.println(f"output image for render has dims ${dpTarget.width} x ${dpTarget.height}")
 			regions.zipWithIndex.foreach{
 				case(region, i) => 
 					Console.println(f"Drawing region $i / ${regions.length}")
-					val rn = rg.nextInt(256)
-					val color = new Scalar(128 + rg.nextInt(128), 128 + rg.nextInt(128), rn)
+					// This is an ugly hack around the CP implementation lying to us
 					Util.checkContains(boundaryRect, region) match {
 						case None => Console.println("Skipping bad rectangle")
 						case Some(region) =>
-							Core.rectangle(griddedBoxesImg, region.tl, ofsPoint(region.br, new Point(-1, -1)), color, -1)
 	
 							//*
-							// The math.min stuff is an ugly hack around the CP implementation lying to us
-							val gridImg = imgRemapped.submat(region.tl.y.intValue, Math.min(imgRemapped.rows,region.br.y.intValue).intValue, region.tl.x.intValue, Math.min(imgRemapped.cols,region.br.x.intValue).intValue)
-							val dstImg = dpTarget.submat(region.tl.y.intValue, Math.min(dpTarget.rows,region.br.y.intValue).intValue, region.tl.x.intValue,  Math.min(dpTarget.cols,region.br.x.intValue).intValue)
+							val gridImg = imgRemapped.submat(region.tl.y.intValue, region.br.y.intValue, region.tl.x.intValue, region.br.x.intValue)
+							val dstImg = dpTarget.submat(region.tl.y.intValue, region.br.y.intValue, region.tl.x.intValue,  region.br.x.intValue)
 							val instr = brickPlacer.evaluate(gridImg, brickLib, BrickSynth.COLOR_TABLE.toSet[(Scalar,Scalar)])
 	
 							instr.foreach{
 							case(proj,colors,brick) =>
 							brick.project(dstImg, colors, Some(proj))
 							}
-							//Console.println(f"Has area: ${region.area} and dims")
-							//if(region.area != 0){
-							Util.makeImageFrame(Util.matToImage(gridImg), f"src $i")
-							Util.makeImageFrame(Util.matToImage(dstImg), f"solved $i")
-							//}
-							Util.makeImageFrame(Util.matToImage(dpTarget), f"solved $i (whole)")
+							//Util.makeImageFrame(Util.matToImage(gridImg), f"src $i")
+							//Util.makeImageFrame(Util.matToImage(dstImg), f"solved $i")
+							//Util.makeImageFrame(Util.matToImage(dpTarget), f"solved $i (whole)")
 							//*/
 
 					}
 					
 			}
-			//Util.makeImageFrame(Util.matToImage(dpTarget), "solved")
-			Util.makeImageFrame(Util.matToImage(boxesImg), "boxes")
-			Util.makeImageFrame(Util.matToImage(griddedBoxesImg), "gridded boxes")
+			Util.makeImageFrame(Util.matToImage(dpTarget), "solved")
 			
 			
 		} else {
