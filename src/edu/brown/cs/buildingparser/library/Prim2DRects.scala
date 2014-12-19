@@ -66,11 +66,16 @@ class Prim2DRect(val data:Mat, val masks:Mat, nameFormatter:(Size => String)) ex
 		val dstChunk = new Mat(data.size, data.`type`)
 		dst.submat(ofs.y.intValue, (ofs.y + bounds.height).intValue, ofs.x.intValue, (ofs.x + bounds.width).intValue).copyTo(dstChunk)
 		
-		val chunkSmooth = new Mat
-		Imgproc.adaptiveBilateralFilter(dstChunk, chunkSmooth, new Size(5, 5), 2)
+		//val chunkSmooth = new Mat
+		//Imgproc.adaptiveBilateralFilter(dstChunk, chunkSmooth, new Size(5, 5), 2)
+		
+		val dstHSV = new Mat
+		Imgproc.cvtColor(dstChunk, dstHSV, Imgproc.COLOR_BGR2HSV)
+		val primHSV = new Mat
+		Imgproc.cvtColor(primRepr, primHSV, Imgproc.COLOR_BGR2HSV)
 		
 		val diff = new Mat
-		Core.absdiff(chunkSmooth, primRepr, diff)
+		Core.absdiff(dstHSV, primHSV, diff)
 		
 		
 		(0 until diff.height).map{ 
@@ -80,7 +85,7 @@ class Prim2DRect(val data:Mat, val masks:Mat, nameFormatter:(Size => String)) ex
 						val cDiffs = diff.get(r, c)
 						val dLen = Math.sqrt(cDiffs.foldLeft(0.0)((b,a) => b + a*a))
 						val okp = 1.0 + params("k")*dLen
-						1.0 / (okp * okp)
+						1.0 / Math.pow(okp,1)
 				}
 		}.flatten.foldLeft(0.0)(_+_) / Math.pow(diff.size.area, 1 - params("l"))
 	}
@@ -185,7 +190,21 @@ object BrickSynth {
 			(new Scalar(0x73, 0x8A, 0x95), new Scalar(0x33, 0x33, 0x33)),
 			(new Scalar(0xC8, 0xAD, 0xE4), new Scalar(0x33, 0x33, 0x33)),
 			(new Scalar(0xBA, 0x78, 0xAC), new Scalar(0x33, 0x33, 0x33)),
-			(new Scalar(0xED, 0xD5, 0xE1), new Scalar(0x33, 0x33, 0x33)))
+			(new Scalar(0xED, 0xD5, 0xE1), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0x9B, 0xCF, 0xF3), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0x98, 0x62, 0xCD), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0x12, 0x2A, 0x58), new Scalar(0x59, 0x59, 0x59)),
+			(new Scalar(0xA9, 0xA5, 0xA0), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0x68, 0x6E, 0x6C), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0xD1, 0x9D, 0x5C), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0xA1, 0xDC, 0x73), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0xCF, 0xCC, 0xFE), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0xB3, 0xD7, 0xF6), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0x2A, 0x70, 0xCC), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0x91, 0x36, 0x3F), new Scalar(0x1E, 0x1E, 0x1E)),
+			(new Scalar(0x3A, 0x50, 0x7C), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0xDB, 0x61, 0x4C), new Scalar(0x33, 0x33, 0x33)),
+			(new Scalar(0x68, 0x91, 0xD0), new Scalar(0x33, 0x33, 0x33)))
 	
 	def getStdBricks():List[Prim2DRect] = {
 		STD_DIMS.map{
@@ -198,6 +217,27 @@ object BrickSynth {
 						}
 				}.flatten, BRICK_STEP)
 		}.flatten
+	}
+}
+
+case class WindowSplit(vert:Boolean, frac:Double, children:Option[(WindowSplit,WindowSplit)])
+
+object WindowSynth {
+	val PLATE_HEIGHT = BrickSynth.PLATE_HEIGHT
+	val BRICK_HEIGHT = BrickSynth.BRICK_HEIGHT
+	val BRICK_STEP = BrickSynth.BRICK_STEP
+	val COLOR_TABLE = BrickSynth.COLOR_TABLE
+	def drawPanes(dst:Mat,rect:Rect, panes:WindowSplit) = {
+		panes match {
+			case WindowSplit(vert, frac, children) =>
+				children match {
+					case None =>
+						Core.rectangle(dst, rect.tl, rect.br, new Scalar(3))
+					case Some(children) =>
+						
+				}
+				
+		}
 	}
 }
 

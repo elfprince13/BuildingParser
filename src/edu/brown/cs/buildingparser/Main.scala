@@ -221,7 +221,7 @@ object Main {
 			val dpTarget = new Mat(imgRemapped.size, imgRemapped.`type`)
 			
 			val brickLib = BrickSynth.getStdBricks()
-			val brickPlacer = new DPEvaluator(LDrawGridify.gridStep, l = 0.9)
+			val brickPlacer = new DPEvaluator(LDrawGridify.gridStep, l = 1.01, k = 1)//0.0125)
 			Console.println(f"output image for render has dims ${dpTarget.width} x ${dpTarget.height}")
 			regions.zipWithIndex.foreach{
 				case(region, i) => 
@@ -257,7 +257,7 @@ object Main {
 		}
 		
 		
-		//*
+		/*
 		val imageTest = Highgui.imread(srcHandle.getAbsolutePath, Highgui.CV_LOAD_IMAGE_GRAYSCALE)
 		Console.println("Testing: " + image.size)
 		val wd = new SVMDetector("trained-svms/1418999570258_window_.opencv_svm",usedHogs,"trained-svms/window-posExSizes.histogram")
@@ -275,15 +275,15 @@ object Main {
 				new Rect(new Point(avgR._2, avgR._3), new Point(avgR._4, avgR._5))
 			}
 		//Console.println()
-		//*/
+		*/
 		
-		//*
+		/*
 		clusterReps.foreach{
 			case(found) =>
 				Core.rectangle(imageTest, found.tl, found.br, new Scalar(1.0))
 		}
 		Util.makeImageFrame(Util.matToImage(imageTest),"window detections")
-		//*/
+		*/
 		
 		
 

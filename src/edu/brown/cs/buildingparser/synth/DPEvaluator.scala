@@ -171,7 +171,7 @@ object DPTest {
 		Imgproc.resize(srcImg, gridImg, gridImg.size)
 		Console.println(f"Resizing ${srcImg.cols} x ${srcImg.rows} to $gridCols x $gridRows for ${LDrawGridify.gridStep}")
 		
-		val brickPlacer = new DPEvaluator(LDrawGridify.gridStep, l = 0.9, k = 1)
+		val brickPlacer = new DPEvaluator(LDrawGridify.gridStep, l = 0.95, k = 0.0125)
 		val instr = brickPlacer.evaluate(gridImg, BrickSynth.getStdBricks(), BrickSynth.COLOR_TABLE.toSet[(Scalar,Scalar)])
 		
 		val dstImg = Mat.zeros(gridImg.size, gridImg.`type`)
