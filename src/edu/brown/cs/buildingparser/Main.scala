@@ -25,6 +25,7 @@ import org.opencv.imgproc.Imgproc
 import org.opencv.core.Rect
 import org.opencv.core.Point
 import edu.brown.cs.buildingparser.synth.LDrawGridify
+import edu.brown.cs.buildingparser.synth.SimpleDragger
 import edu.brown.cs.buildingparser.synth.ObjConstraints
 import edu.brown.cs.buildingparser.synth.DPSubdivider
 
@@ -111,7 +112,7 @@ object Main {
 		}
 		
 		showAvgObjects(image, clusteredContents, new Point(0, 0))
-		showObjectBorders(image, imgContents)
+		//showObjectBorders(image, imgContents)
 		
 		
 		val imgClip = image.submat(128, image.rows - 128, 128, image.cols - 128) 
@@ -171,6 +172,9 @@ object Main {
 			
 			showObjectBorders(griddedBoxesImg, griddedContents)
 			
+			
+			val imgRemapped = Mat.zeros(griddedBoxesImg.size, griddedBoxesImg.`type`)
+			
 			val stripper = new DPSubdivider(LDrawGridify.gridStep)
 			val regions = stripper.getNonObjRegions(new Rect(new Point(0,0),solver.getSolvedBoundary), stripper.sortObjs(griddedClusteredContents.values.flatMap(_.values.flatten).toList))//, Some(griddedBoxesImg))
 			regions.foreach{
@@ -181,6 +185,7 @@ object Main {
 			}
 			Util.makeImageFrame(Util.matToImage(boxesImg), "boxes")
 			Util.makeImageFrame(Util.matToImage(griddedBoxesImg), "gridded boxes")
+			
 			
 		} else {
 			Console.println("Could not achieve a valid gridded facade.")
