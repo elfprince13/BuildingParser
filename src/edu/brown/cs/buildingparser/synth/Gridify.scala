@@ -319,7 +319,7 @@ class ObjConstraints(boundary:Size, objs:Map[String,Map[Int,List[Rect]]], gridSt
  * 
  ***********/
 
-object LDrawGridify extends Gridify((15,8), (20,8))
+object LDrawGridify extends Gridify((8,15), (20,8))
 
 class Gridify(val pixel2GridRatio:(Int,Int), val gridStep:(Int, Int)) {
 	

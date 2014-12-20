@@ -95,7 +95,7 @@ object Main {
 					defaultHog.get_cellSize, defaultHog.get_nbins))
 		
 		val grazSampler = SamplerMain.grazSampler
-		val srcHandle = grazSampler.imgHandleFromName("facade_1_0056092_0056345.png")//("facade_0_0099003_0099285.png")//
+		val srcHandle = grazSampler.imgHandleFromName("facade_0_0053403_0053679.png")//("facade_1_0056092_0056345.png")//("facade_0_0099003_0099285.png")//
 		val labelHandle = grazSampler.pairedImgs(srcHandle)
 		val (srcBase, examples) = grazSampler.extractOneExampleSet(srcHandle, labelHandle)
 		val srcImg = Highgui.imread(srcHandle.getAbsolutePath, Highgui.CV_LOAD_IMAGE_COLOR)
